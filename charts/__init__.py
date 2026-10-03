@@ -1,0 +1,1 @@
+"""Grafik matplotlib (backend Agg)."""
