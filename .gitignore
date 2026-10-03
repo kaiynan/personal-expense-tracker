@@ -1,0 +1,38 @@
+# Rahasia (jangan pernah ter-commit)
+.env
+.env.*
+!.env.example
+
+# Lingkungan virtual
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Pengujian
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data dan hasil program (berisi data keuangan)
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+backups/
+reports_output/
+logs/
+*.log
+
+# Editor dan sistem operasi
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
