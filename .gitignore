@@ -16,6 +16,7 @@ dist/
 
 # Pengujian
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 

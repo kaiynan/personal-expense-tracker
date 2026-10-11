@@ -33,18 +33,29 @@ REPORTS_DIR: Path = BASE_DIR / "reports_output"
 # DB_PATH bisa dioverride lewat .env (relatif terhadap root proyek).
 DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "data/expense_tracker.db")
 
+# URL SQLAlchemy/Alembic. SQLite dulu; kode tidak memakai fitur khusus SQLite
+# sehingga bagian ini cukup diganti saat pindah ke PostgreSQL.
+DATABASE_URL: str = f"sqlite:///{DB_PATH.as_posix()}"
+
 # --- Zona waktu & format tanggal ----------------------------------------------
 TIMEZONE_NAME: str = "Asia/Jakarta"
 TIMEZONE: ZoneInfo = ZoneInfo(TIMEZONE_NAME)
 
-DATE_FORMAT_DB: str = "%Y-%m-%d"       # disimpan di database (ISO)
+DATE_FORMAT_DB: str = "%Y-%m-%d"  # disimpan di database (ISO)
 DATE_FORMAT_DISPLAY: str = "%d-%m-%Y"  # input/tampilan ke pengguna
-WEEK_START: int = 0                    # 0 = Senin (sesuai datetime.weekday())
+WEEK_START: int = 0  # 0 = Senin (sesuai datetime.weekday())
 
 # --- Budget -------------------------------------------------------------------
 # Ambang dalam persen (integer) dari nominal budget.
-BUDGET_WARNING_PERCENT: int = 80    # >= nilai ini: "mendekati batas"
+BUDGET_WARNING_PERCENT: int = 80  # >= nilai ini: "mendekati batas"
 BUDGET_EXCEEDED_PERCENT: int = 100  # >= nilai ini: "melewati batas"
+
+# --- Validasi input -------------------------------------------------------------
+# Nominal maksimum satu transaksi / saldo yang boleh dimasukkan (rupiah, integer).
+# Mencegah salah ketik (mis. kelebihan beberapa nol) masuk ke database.
+MAX_AMOUNT: int = 1_000_000_000_000  # Rp1 triliun
+# Panjang maksimum keterangan; tidak boleh melebihi panjang kolom `transactions.note`.
+MAX_NOTE_LENGTH: int = 255
 
 # --- Telegram -----------------------------------------------------------------
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -71,9 +82,7 @@ def _parse_id_list(raw: str) -> frozenset[int]:
 
 
 # Whitelist user ID Telegram. Kosong = tidak ada yang diizinkan.
-ALLOWED_TELEGRAM_IDS: frozenset[int] = _parse_id_list(
-    os.getenv("ALLOWED_TELEGRAM_IDS", "")
-)
+ALLOWED_TELEGRAM_IDS: frozenset[int] = _parse_id_list(os.getenv("ALLOWED_TELEGRAM_IDS", ""))
 
 # --- Logging ------------------------------------------------------------------
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()

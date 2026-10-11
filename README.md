@@ -2,7 +2,7 @@
 
 Aplikasi pengelolaan keuangan pribadi dengan dua antarmuka — **CLI** dan **Telegram Bot** — yang berbagi satu database **SQLite**.
 
-> Status: kerangka proyek (fase 0). Fitur belum tersedia.
+> Status: fase 1 (lapisan database: SQLAlchemy + Alembic). Fitur pengguna belum tersedia.
 
 ## Kebutuhan
 
@@ -49,6 +49,18 @@ Aplikasi pengelolaan keuangan pribadi dengan dua antarmuka — **CLI** dan **Tel
    ```bash
    python main.py
    ```
+
+## Database dan migrasi
+
+Skema dikelola dengan [Alembic](https://alembic.sqlalchemy.org/). `python main.py` otomatis menerapkan migrasi terbaru dan mengisi data awal (Cash, Bank, E-Wallet, dan kategori default). Perintah manual:
+
+```bash
+alembic upgrade head                                    # terapkan migrasi
+alembic revision --autogenerate -m "deskripsi perubahan"  # buat migrasi setelah mengubah models/
+alembic check                                           # cek model dan migrasi masih sinkron
+```
+
+Setelah membuat migrasi otomatis, **selalu periksa isinya** sebelum dipakai.
 
 ## Menjalankan tes
 
