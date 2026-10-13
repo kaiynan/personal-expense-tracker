@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 
 from database import queries
 from models import (
+    ACTION_CREATE,
+    ACTION_DELETE,
+    ACTION_RESTORE,
+    ACTION_UPDATE,
     STATUS_ACTIVE,
     STATUS_DELETED,
     TRANSACTION_TYPES,
@@ -19,10 +23,13 @@ from models import (
     TYPE_TRANSFER,
     Transaction,
 )
+from services import audit
 from services.common import (
     balance_snapshot,
     before_opening_warnings,
+    check_daily_transaction_limit,
     negative_balance_warnings,
+    newer_adjustment_warnings,
     require_user,
     resolve_date,
 )
@@ -52,6 +59,7 @@ def _add_categorized(
     user = require_user(session, user_id)
     amount = validate_amount(amount)
     tx_date = resolve_date(user, on)
+    check_daily_transaction_limit(session, user_id, tx_date, 1)
     note = validate_note(note)
     category = validate_category(session, user_id, category_id, type_)
     method = validate_method(session, user_id, method_id)
@@ -67,6 +75,16 @@ def _add_categorized(
         note=note,
     )
     session.add(tx)
+    session.flush()
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_CREATE,
+        entity_type="transaction",
+        entity_id=tx.id,
+        new_values=audit._snapshot_transaction(tx),
+        description=f"Tambah {type_} Rp{amount:,} ({category.name}) via {method.name}",
+    )
     warnings = before_opening_warnings(session, user_id, tx_date, [method.id])
     warnings += negative_balance_warnings(session, user_id, before, [method.id])
     return TransactionResult(tx, warnings)
@@ -109,6 +127,15 @@ def get_transaction(
     if tx is None:
         raise NotFoundError(f"Transaksi #{transaction_id} tidak ditemukan.")
     return tx
+
+
+def get_related_transactions(
+    session: Session, user_id: int, parent_transaction_id: int, include_deleted: bool = False
+) -> list[Transaction]:
+    """Ambil transaksi yang terhubung ke `parent_transaction_id` milik `user_id`."""
+    return queries.get_related_transactions(
+        session, user_id, parent_transaction_id, include_deleted=include_deleted
+    )
 
 
 def list_transactions(
@@ -217,6 +244,7 @@ def edit_transaction(
         m for rel in related for m in (rel.method_id, rel.to_method_id)
     ]
     before = balance_snapshot(session, user_id)
+    old_snap = audit._snapshot_transaction(tx, related)
     for attr, value in changes.items():
         setattr(tx, attr, value)
 
@@ -227,6 +255,19 @@ def edit_transaction(
     if "method_id" in changes:
         for rel in related:
             rel.method_id = tx.method_id
+
+    session.flush()
+    new_snap = audit._snapshot_transaction(tx, related)
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_UPDATE,
+        entity_type="transaction",
+        entity_id=tx.id,
+        old_values=old_snap,
+        new_values=new_snap,
+        description=f"Edit transaksi #{tx.id}",
+    )
 
     affected += [tx.method_id, tx.to_method_id] + [
         m for rel in related for m in (rel.method_id, rel.to_method_id)
@@ -242,6 +283,13 @@ def edit_transaction(
                 warnings += before_opening_warnings(
                     session, user_id, rel.date, [rel.method_id, rel.to_method_id]
                 )
+    warnings += newer_adjustment_warnings(
+        session,
+        user_id,
+        min(tx.date, changes.get("date", tx.date)),
+        affected,
+        exclude_id=tx.id,
+    )
     warnings += negative_balance_warnings(session, user_id, before, affected)
     return TransactionResult(tx, warnings)
 
@@ -269,11 +317,32 @@ def delete_transaction(session: Session, user_id: int, transaction_id: int) -> T
     ]
 
     before = balance_snapshot(session, user_id)
+    old_snap = audit._snapshot_transaction(tx, related)
     tx.status = STATUS_DELETED
     for rel in related:
         rel.status = STATUS_DELETED
 
-    warnings = negative_balance_warnings(session, user_id, before, affected)
+    session.flush()
+    new_snap = audit._snapshot_transaction(tx, related)
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_DELETE,
+        entity_type="transaction",
+        entity_id=tx.id,
+        old_values=old_snap,
+        new_values=new_snap,
+        description=f"Hapus transaksi #{tx.id}",
+    )
+
+    warnings = newer_adjustment_warnings(
+        session,
+        user_id,
+        tx.date,
+        affected,
+        exclude_id=tx.id,
+    )
+    warnings += negative_balance_warnings(session, user_id, before, affected)
     return TransactionResult(tx, warnings)
 
 
@@ -296,9 +365,23 @@ def restore_transaction(session: Session, user_id: int, transaction_id: int) -> 
     ]
 
     before = balance_snapshot(session, user_id)
+    old_snap = audit._snapshot_transaction(tx, related)
     tx.status = STATUS_ACTIVE
     for rel in related:
         rel.status = STATUS_ACTIVE
+
+    session.flush()
+    new_snap = audit._snapshot_transaction(tx, related)
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_RESTORE,
+        entity_type="transaction",
+        entity_id=tx.id,
+        old_values=old_snap,
+        new_values=new_snap,
+        description=f"Pulihkan transaksi #{tx.id}",
+    )
 
     methods = [tx.method_id, tx.to_method_id] + [
         m for rel in related for m in (rel.method_id, rel.to_method_id)
@@ -309,5 +392,12 @@ def restore_transaction(session: Session, user_id: int, transaction_id: int) -> 
             warnings += before_opening_warnings(
                 session, user_id, rel.date, [rel.method_id, rel.to_method_id]
             )
+    warnings += newer_adjustment_warnings(
+        session,
+        user_id,
+        tx.date,
+        methods,
+        exclude_id=tx.id,
+    )
     warnings += negative_balance_warnings(session, user_id, before, methods)
     return TransactionResult(tx, warnings)

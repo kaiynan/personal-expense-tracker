@@ -1,15 +1,19 @@
 """Titik masuk Personal Expense Tracker.
 
-Fase 1: menyiapkan logging dan folder, menerapkan migrasi database (Alembic),
-mengisi data awal, lalu menampilkan pesan awal. Menu CLI dan bot Telegram
-akan ditambahkan di fase berikutnya.
+Inisialisasi konfigurasi, logging, dan migrasi database, lalu menjalankan menu CLI.
 """
 
+from __future__ import annotations
+
+import argparse
 import logging
 import sys
 from datetime import datetime
+from typing import Any
 
 import config
+from bot import run_bot
+from cli import run_cli
 from database.engine import create_db_engine, create_session_factory, session_scope
 from database.migrate import upgrade_to_head
 from database.seed import ensure_default_user, seed_defaults
@@ -18,21 +22,34 @@ logger = logging.getLogger(__name__)
 
 
 def setup_logging() -> None:
-    """Konfigurasi logging dasar ke stderr sesuai LOG_LEVEL di config."""
-    logging.basicConfig(level=config.LOG_LEVEL, format=config.LOG_FORMAT)
+    """Konfigurasi logging ke console dan file logs/app.log (tanpa data sensitif)."""
+    config.ensure_directories()
+    handlers: list[logging.Handler] = [
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(config.LOG_FILE, encoding="utf-8"),
+    ]
+    logging.basicConfig(
+        level=config.LOG_LEVEL,
+        format=config.LOG_FORMAT,
+        handlers=handlers,
+        force=True,
+    )
 
 
-def init_database() -> str:
-    """Migrasi ke versi terbaru dan isi data awal. Mengembalikan nama pengguna aktif."""
+def init_database() -> tuple[Any, int, str]:
+    """Migrasi ke versi terbaru dan isi data awal.
+
+    Mengembalikan (engine, user_id, user_name).
+    """
     upgrade_to_head()
     engine = create_db_engine()
-    try:
-        with session_scope(create_session_factory(engine)) as session:
-            user = ensure_default_user(session)
-            seed_defaults(session, user.id)
-            return user.name
-    finally:
-        engine.dispose()
+    factory = create_session_factory(engine)
+    with session_scope(factory) as session:
+        user = ensure_default_user(session)
+        seed_defaults(session, user.id)
+        user_id = user.id
+        user_name = user.name
+    return engine, user_id, user_name
 
 
 def print_welcome(user_name: str) -> None:
@@ -52,16 +69,28 @@ def print_welcome(user_name: str) -> None:
     print(f"Token Telegram   : {token_status}")
     print(f"Whitelist ID     : {len(config.ALLOWED_TELEGRAM_IDS)} pengguna")
     print("-" * 50)
-    print("Lapisan database siap. Fitur belum tersedia.")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Jalankan aplikasi. Mengembalikan kode keluar (0 = sukses)."""
+    parser = argparse.ArgumentParser(description=config.APP_NAME)
+    parser.add_argument("--bot", action="store_true", help="Jalankan antarmuka Telegram Bot")
+    args = parser.parse_args(argv)
+
     setup_logging()
     try:
         config.ensure_directories()
-        user_name = init_database()
-        print_welcome(user_name)
+        engine, user_id, user_name = init_database()
+        try:
+            factory = create_session_factory(engine)
+            if args.bot:
+                logger.info("Menjalankan %s Telegram Bot...", config.APP_NAME)
+                run_bot(factory)
+            else:
+                print_welcome(user_name)
+                run_cli(factory, user_id)
+        finally:
+            engine.dispose()
     except Exception:
         logger.exception("Gagal menjalankan aplikasi")
         return 1

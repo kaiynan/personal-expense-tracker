@@ -5,7 +5,13 @@ from datetime import date
 from models import STATUS_ACTIVE
 from services import balances as bal
 from services import transactions as svc
-from services.results import BEFORE_OPENING_DATE, NEGATIVE_BALANCE, warning_codes
+from services.adjustments import adjust_balance
+from services.results import (
+    BEFORE_OPENING_DATE,
+    NEGATIVE_BALANCE,
+    NEWER_ADJUSTMENT,
+    warning_codes,
+)
 from services.transfers import add_transfer
 from tests.services_layer.conftest import D
 
@@ -125,3 +131,45 @@ def test_restore_before_opening_warns(session, alice):
     alice.open(alice.cash, 100_000, effective=date(2026, 3, 1))
     result = svc.restore_transaction(session, alice.id, tx.id)
     assert warning_codes(result.warnings) == [BEFORE_OPENING_DATE]
+
+
+# --- Transaksi lama dengan koreksi saldo lebih baru ----------------------------
+def test_edit_transaction_with_newer_adjustment_warns(session, alice):
+    alice.open(alice.cash, 100_000, effective=date(2026, 2, 1))
+    tx = svc.add_expense(
+        session, alice.id, 20_000, alice.food, alice.cash, on="05-02-2026"
+    ).transaction
+    adjust_balance(session, alice.id, alice.cash, 150_000, on="10-02-2026")
+
+    result = svc.edit_transaction(session, alice.id, tx.id, amount=30_000)
+    assert NEWER_ADJUSTMENT in warning_codes(result.warnings)
+    w = next(w for w in result.warnings if w.code == NEWER_ADJUSTMENT)
+    assert w.method_id == alice.cash
+    assert "Cash" in w.message and "10-02-2026" in w.message
+
+
+def test_delete_transaction_with_newer_adjustment_warns(session, alice):
+    alice.open(alice.cash, 100_000, effective=date(2026, 2, 1))
+    tx = svc.add_expense(
+        session, alice.id, 20_000, alice.food, alice.cash, on="05-02-2026"
+    ).transaction
+    adjust_balance(session, alice.id, alice.cash, 150_000, on="10-02-2026")
+
+    result = svc.delete_transaction(session, alice.id, tx.id)
+    assert NEWER_ADJUSTMENT in warning_codes(result.warnings)
+    w = next(w for w in result.warnings if w.code == NEWER_ADJUSTMENT)
+    assert w.method_id == alice.cash
+
+
+def test_transaction_newer_than_adjustment_does_not_warn(session, alice):
+    alice.open(alice.cash, 100_000, effective=date(2026, 2, 1))
+    adjust_balance(session, alice.id, alice.cash, 150_000, on="10-02-2026")
+    tx = svc.add_expense(
+        session, alice.id, 20_000, alice.food, alice.cash, on="15-02-2026"
+    ).transaction
+
+    result = svc.edit_transaction(session, alice.id, tx.id, amount=30_000)
+    assert NEWER_ADJUSTMENT not in warning_codes(result.warnings)
+
+    del_result = svc.delete_transaction(session, alice.id, tx.id)
+    assert NEWER_ADJUSTMENT not in warning_codes(del_result.warnings)

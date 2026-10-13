@@ -95,3 +95,11 @@ def add_tx(session):
         return tx
 
     return _add
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset rate limiter per-test agar tidak memblokir uji coba berulang."""
+    from utils.rate_limiter import global_rate_limiter
+
+    global_rate_limiter.reset()

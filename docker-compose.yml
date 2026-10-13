@@ -1,0 +1,45 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: personal-expense-tracker:latest
+    container_name: personal-expense-tracker-bot
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_PATH: ${DB_PATH:-data/expense_tracker.db}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: Asia/Jakarta
+    volumes:
+      - ./data:/app/data
+      - ./reports_output:/app/reports_output
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    command: ["python", "main.py", "--bot"]
+
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: personal-expense-tracker:latest
+    container_name: personal-expense-tracker-cli
+    profiles:
+      - cli
+    stdin_open: true
+    tty: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_PATH: ${DB_PATH:-data/expense_tracker.db}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: Asia/Jakarta
+    volumes:
+      - ./data:/app/data
+      - ./reports_output:/app/reports_output
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    command: ["python", "main.py"]

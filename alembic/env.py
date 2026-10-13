@@ -16,15 +16,31 @@ def _database_url() -> str:
 
 def _configure_and_run(connection) -> None:
     """Jalankan migrasi pada koneksi yang diberikan."""
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        render_as_batch=True,  # SQLite tidak mendukung semua ALTER TABLE
-        compare_type=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-    connection.commit()
+    is_sqlite = connection.dialect.name == "sqlite"
+    if is_sqlite:
+        if connection.in_transaction():
+            connection.commit()
+        connection.exec_driver_sql("PRAGMA foreign_keys = OFF")
+        if connection.in_transaction():
+            connection.commit()
+    try:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,  # SQLite tidak mendukung semua ALTER TABLE
+            compare_type=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        if connection.in_transaction():
+            connection.commit()
+    finally:
+        if is_sqlite:
+            if connection.in_transaction():
+                connection.commit()
+            connection.exec_driver_sql("PRAGMA foreign_keys = ON")
+            if connection.in_transaction():
+                connection.commit()
 
 
 def run_migrations_offline() -> None:

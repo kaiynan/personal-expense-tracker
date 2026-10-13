@@ -1,0 +1,22 @@
+# Virtual environment & cache Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Git & CI
+.git/
+.gitignore
+.github/
+
+# Rahasia & konfigurasi lokal (dipasang saat runtime lewat env_file / environment)
+.env
+
+# Data runtime lokal (dipasang lewat volume di docker-compose.yml)
+data/
+logs/
+reports_output/
+backups/

@@ -29,6 +29,7 @@ APP_VERSION: str = "0.1.0"
 # --- Database & folder output -------------------------------------------------
 DATA_DIR: Path = BASE_DIR / "data"
 REPORTS_DIR: Path = BASE_DIR / "reports_output"
+BACKUPS_DIR: Path = BASE_DIR / "backups"
 
 # DB_PATH bisa dioverride lewat .env (relatif terhadap root proyek).
 DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "data/expense_tracker.db")
@@ -56,6 +57,16 @@ BUDGET_EXCEEDED_PERCENT: int = 100  # >= nilai ini: "melewati batas"
 MAX_AMOUNT: int = 1_000_000_000_000  # Rp1 triliun
 # Panjang maksimum keterangan; tidak boleh melebihi panjang kolom `transactions.note`.
 MAX_NOTE_LENGTH: int = 255
+# Panjang maksimum nama kategori; tidak boleh melebihi panjang kolom `categories.name`.
+MAX_CATEGORY_NAME_LENGTH: int = 50
+# Panjang maksimum nama transaksi rutin; tidak boleh melebihi kolom `recurring.name`.
+MAX_RECURRING_NAME_LENGTH: int = 100
+
+# --- Batas Transaksi Harian & Rate Limit (V3) ---------------------------------
+# Batas jumlah transaksi per hari yang dapat dicatat oleh satu pengguna.
+MAX_DAILY_TRANSACTIONS_PER_USER: int = int(os.getenv("MAX_DAILY_TRANSACTIONS_PER_USER", "100"))
+# Batas jumlah request/perintah bot per menit per pengguna.
+RATE_LIMIT_REQUESTS_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "30"))
 
 # --- Telegram -----------------------------------------------------------------
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -85,12 +96,16 @@ def _parse_id_list(raw: str) -> frozenset[int]:
 ALLOWED_TELEGRAM_IDS: frozenset[int] = _parse_id_list(os.getenv("ALLOWED_TELEGRAM_IDS", ""))
 
 # --- Logging ------------------------------------------------------------------
+LOGS_DIR: Path = BASE_DIR / "logs"
+LOG_FILE: Path = LOGS_DIR / "app.log"
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 LOG_FORMAT: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
 def ensure_directories() -> None:
-    """Buat folder data dan output laporan jika belum ada."""
+    """Buat folder data, logs, output laporan, dan backups jika belum ada."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)

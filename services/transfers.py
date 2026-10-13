@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 
 from database import queries
 from database.seed import ADMIN_FEE_CATEGORY
-from models import TYPE_EXPENSE, TYPE_TRANSFER, Category, Transaction
+from models import ACTION_CREATE, TYPE_EXPENSE, TYPE_TRANSFER, Category, Transaction
+from services import audit
 from services.common import (
     balance_snapshot,
     before_opening_warnings,
+    check_daily_transaction_limit,
     negative_balance_warnings,
     require_user,
     resolve_date,
@@ -55,6 +57,7 @@ def add_transfer(
     amount = validate_amount(amount, "Nominal transfer")
     fee = validate_balance(admin_fee, "Biaya admin") if admin_fee is not None else 0
     tx_date = resolve_date(user, on)
+    check_daily_transaction_limit(session, user_id, tx_date, 2 if fee > 0 else 1)
     note = validate_note(note)
     source = validate_method(session, user_id, from_method_id)
     target = validate_method(session, user_id, to_method_id)
@@ -88,6 +91,19 @@ def add_transfer(
             related_transaction_id=transfer.id,
         )
         session.add(fee_tx)
+
+    session.flush()
+    related = [fee_tx] if fee_tx else []
+    fee_desc = f" (Biaya Admin Rp{fee:,})" if fee else ""
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_CREATE,
+        entity_type="transaction",
+        entity_id=transfer.id,
+        new_values=audit._snapshot_transaction(transfer, related),
+        description=f"Transfer Rp{amount:,} {source.name} -> {target.name}{fee_desc}",
+    )
 
     methods = [source.id, target.id]
     warnings = before_opening_warnings(session, user_id, tx_date, methods)

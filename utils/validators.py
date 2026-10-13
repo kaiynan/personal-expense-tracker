@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 import config
 from database import queries
-from models import Category, PaymentMethod
+from models import (
+    CATEGORY_TYPES,
+    FREQUENCY_MONTHLY,
+    RECURRING_FREQUENCIES,
+    Category,
+    PaymentMethod,
+)
 from utils.errors import ValidationError
 
 _DATE_PATTERN = re.compile(r"\d{2}-\d{2}-\d{4}")
@@ -135,3 +141,75 @@ def validate_category(
     if category.is_system and not allow_system:
         raise ValidationError(f"Kategori '{category.name}' dipakai otomatis oleh sistem.")
     return category
+
+
+def validate_category_name(value: object) -> str:
+    """Nama kategori: teks wajib diisi, tidak boleh hanya spasi, maks 50 karakter."""
+    if value is None:
+        raise ValidationError("Nama kategori wajib diisi.")
+    if not isinstance(value, str):
+        raise ValidationError("Nama kategori harus berupa teks.")
+    text = value.strip()
+    if not text:
+        raise ValidationError("Nama kategori tidak boleh kosong.")
+    if len(text) > config.MAX_CATEGORY_NAME_LENGTH:
+        raise ValidationError(
+            f"Nama kategori maksimal {config.MAX_CATEGORY_NAME_LENGTH} karakter "
+            f"(sekarang {len(text)})."
+        )
+    return text
+
+
+def validate_category_type(value: object) -> str:
+    """Jenis kategori: harus 'income' atau 'expense'."""
+    if not isinstance(value, str):
+        raise ValidationError("Jenis kategori harus berupa teks.")
+    text = value.strip().lower()
+    if text not in CATEGORY_TYPES:
+        raise ValidationError(
+            f"Jenis kategori tidak valid: {value!r}. Harus 'income' atau 'expense'."
+        )
+    return text
+
+
+def validate_recurring_name(value: object) -> str:
+    """Nama transaksi rutin: teks wajib diisi, tidak boleh hanya spasi, maks 100 karakter."""
+    if value is None:
+        raise ValidationError("Nama transaksi rutin wajib diisi.")
+    if not isinstance(value, str):
+        raise ValidationError("Nama transaksi rutin harus berupa teks.")
+    text = value.strip()
+    if not text:
+        raise ValidationError("Nama transaksi rutin tidak boleh kosong.")
+    if len(text) > config.MAX_RECURRING_NAME_LENGTH:
+        raise ValidationError(
+            f"Nama transaksi rutin maksimal {config.MAX_RECURRING_NAME_LENGTH} karakter "
+            f"(sekarang {len(text)})."
+        )
+    return text
+
+
+def validate_frequency(value: object) -> str:
+    """Frekuensi transaksi rutin: daily, weekly, monthly, atau yearly."""
+    if value is None:
+        return FREQUENCY_MONTHLY
+    if not isinstance(value, str):
+        raise ValidationError("Frekuensi transaksi rutin harus berupa teks.")
+    text = value.strip().lower()
+    if text not in RECURRING_FREQUENCIES:
+        raise ValidationError(
+            f"Frekuensi tidak valid: {value!r}. Pilihan: {', '.join(RECURRING_FREQUENCIES)}."
+        )
+    return text
+
+
+def validate_day_of_month(value: object, frequency: str) -> int | None:
+    """Hari/tanggal dalam bulan (1-31) untuk transaksi bulanan."""
+    if frequency != FREQUENCY_MONTHLY:
+        return None
+    if value is None:
+        raise ValidationError("Tanggal dalam bulan wajib diisi untuk transaksi rutin bulanan.")
+    day = _to_int(value, "Tanggal dalam bulan")
+    if not (1 <= day <= 31):
+        raise ValidationError("Tanggal dalam bulan harus antara 1 sampai 31.")
+    return day

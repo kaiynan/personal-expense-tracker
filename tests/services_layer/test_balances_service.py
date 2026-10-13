@@ -178,3 +178,28 @@ def test_balance_invalid_inputs(session, alice):
         bal.get_total_balance(session, alice.id, as_of="2026-02-28")
     with pytest.raises(NotFoundError):
         bal.get_method_balance(session, alice.id, 999_999)
+
+
+def test_check_balance_consistency(session, alice):
+    alice.open(alice.cash, 100_000, effective=date(2026, 2, 1))
+    alice.open(alice.bank, 500_000, effective=date(2026, 2, 1))
+    # Transaksi sebelum saldo awal (diabaikan)
+    tx_svc.add_income(session, alice.id, 50_000, alice.salary, alice.cash, on="15-01-2026")
+    # Mutasi aktif
+    tx_svc.add_income(session, alice.id, 200_000, alice.salary, alice.cash, on="05-02-2026")
+    tx_svc.add_expense(session, alice.id, 50_000, alice.food, alice.cash, on="06-02-2026")
+    add_transfer(
+        session, alice.id, 100_000, alice.bank, alice.cash, on="07-02-2026", admin_fee=2_500
+    )
+    adjust_balance(session, alice.id, alice.cash, 400_000, on="08-02-2026")
+
+    results = bal.check_balance_consistency(session, alice.id)
+    assert len(results) == len(alice.methods)
+    for r in results:
+        assert r.is_consistent is True
+        assert r.difference == 0
+        assert r.compute_balance == r.raw_balance
+
+    cash_r = next(r for r in results if r.name == "Cash")
+    assert cash_r.compute_balance == 400_000
+    assert cash_r.raw_balance == 400_000

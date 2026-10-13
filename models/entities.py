@@ -22,10 +22,13 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
+    Text,
     UniqueConstraint,
     false,
     text,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,9 +44,66 @@ TYPE_ADJUSTMENT = "adjustment"
 STATUS_ACTIVE = "active"
 STATUS_DELETED = "deleted"
 
+FREQUENCY_DAILY = "daily"
+FREQUENCY_WEEKLY = "weekly"
+FREQUENCY_MONTHLY = "monthly"
+FREQUENCY_YEARLY = "yearly"
+
+ACTION_CREATE = "create"
+ACTION_UPDATE = "update"
+ACTION_DELETE = "delete"
+ACTION_RESTORE = "restore"
+ACTION_UNDO = "undo"
+
 TRANSACTION_TYPES = (TYPE_INCOME, TYPE_EXPENSE, TYPE_TRANSFER, TYPE_ADJUSTMENT)
 CATEGORY_TYPES = (TYPE_INCOME, TYPE_EXPENSE)
 TRANSACTION_STATUSES = (STATUS_ACTIVE, STATUS_DELETED)
+RECURRING_FREQUENCIES = (
+    FREQUENCY_DAILY,
+    FREQUENCY_WEEKLY,
+    FREQUENCY_MONTHLY,
+    FREQUENCY_YEARLY,
+)
+AUDIT_ACTIONS = (
+    ACTION_CREATE,
+    ACTION_UPDATE,
+    ACTION_DELETE,
+    ACTION_RESTORE,
+    ACTION_UNDO,
+)
+
+TARGET_CATEGORY = "category"
+TARGET_PAYMENT_METHOD = "payment_method"
+ALIAS_TARGET_TYPES = (TARGET_CATEGORY, TARGET_PAYMENT_METHOD)
+
+REMINDER_DAILY = "daily"
+REMINDER_WEEKLY = "weekly"
+REMINDER_MONTHLY = "monthly"
+REMINDER_TYPES = (REMINDER_DAILY, REMINDER_WEEKLY, REMINDER_MONTHLY)
+
+NOTIFICATION_DAILY = "daily"
+NOTIFICATION_WEEKLY = "weekly"
+NOTIFICATION_MONTHLY = "monthly"
+NOTIFICATION_RECURRING = "recurring"
+NOTIFICATION_PREDICTIVE_BUDGET = "predictive_budget"
+NOTIFICATION_PREDICTIVE_RUNWAY = "predictive_runway"
+NOTIFICATION_TYPES = (
+    NOTIFICATION_DAILY,
+    NOTIFICATION_WEEKLY,
+    NOTIFICATION_MONTHLY,
+    NOTIFICATION_RECURRING,
+    NOTIFICATION_PREDICTIVE_BUDGET,
+    NOTIFICATION_PREDICTIVE_RUNWAY,
+)
+
+ROLE_USER = "user"
+ROLE_ADMIN = "admin"
+USER_ROLES = (ROLE_USER, ROLE_ADMIN)
+
+USER_STATUS_PENDING = "pending"
+USER_STATUS_ACTIVE = "active"
+USER_STATUS_BLOCKED = "blocked"
+USER_STATUSES = (USER_STATUS_PENDING, USER_STATUS_ACTIVE, USER_STATUS_BLOCKED)
 
 
 def _utcnow() -> dt.datetime:
@@ -57,13 +117,21 @@ def _in(column: str, values: tuple[str, ...]) -> str:
 
 
 class User(Base):
-    """Pengguna aplikasi. V1 hanya satu pengguna, tetapi skema sudah multi-user."""
+    """Pengguna aplikasi. V1 hanya satu pengguna, V3 mendukung multi-user dengan role & status."""
 
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(_in("role", USER_ROLES), name="role_valid"),
+        CheckConstraint(_in("status", USER_STATUSES), name="status_valid"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     name: Mapped[str] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(20), default=ROLE_USER, server_default=ROLE_USER)
+    status: Mapped[str] = mapped_column(
+        String(20), default=USER_STATUS_ACTIVE, server_default=USER_STATUS_ACTIVE
+    )
     timezone: Mapped[str] = mapped_column(
         String(50), default=config.TIMEZONE_NAME, server_default=config.TIMEZONE_NAME
     )
@@ -177,6 +245,7 @@ class Budget(Base):
             postgresql_where=text("category_id IS NULL"),
         ),
         CheckConstraint("amount > 0", name="amount_positive"),
+        CheckConstraint("carryover_amount >= 0", name="carryover_non_negative"),
         CheckConstraint("length(month) = 7", name="month_format"),
     )
 
@@ -185,3 +254,224 @@ class Budget(Base):
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
     month: Mapped[str] = mapped_column(String(7))  # 'YYYY-MM'
     amount: Mapped[int] = mapped_column(BigInteger)
+    carryover_amount: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    is_rollover_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+
+
+class WeeklyBudget(Base):
+    """Budget mingguan (Senin s.d. Minggu). `category_id` NULL berarti budget total mingguan."""
+
+    __tablename__ = "weekly_budgets"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "category_id",
+            "week_start",
+            name="uq_weekly_budgets_user_id_category_id_week_start",
+        ),
+        Index(
+            "uq_weekly_budgets_total_per_week",
+            "user_id",
+            "week_start",
+            unique=True,
+            sqlite_where=text("category_id IS NULL"),
+            postgresql_where=text("category_id IS NULL"),
+        ),
+        CheckConstraint("amount > 0", name="amount_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    week_start: Mapped[dt.date] = mapped_column(Date)
+    amount: Mapped[int] = mapped_column(BigInteger)
+
+
+class RecurringTransaction(Base):
+    """Transaksi rutin (kos, internet, langganan, dsb.)."""
+
+    __tablename__ = "recurring"
+    __table_args__ = (
+        CheckConstraint(_in("type", CATEGORY_TYPES), name="type_valid"),
+        CheckConstraint("amount > 0", name="amount_positive"),
+        CheckConstraint("length(trim(name)) > 0", name="name_not_blank"),
+        CheckConstraint(_in("frequency", RECURRING_FREQUENCIES), name="frequency_valid"),
+        CheckConstraint(
+            "day_of_month IS NULL OR (day_of_month >= 1 AND day_of_month <= 31)",
+            name="day_of_month_valid",
+        ),
+        Index("ix_recurring_user_active", "user_id", "is_active"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String(100))
+    type: Mapped[str] = mapped_column(String(10))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    method_id: Mapped[int] = mapped_column(ForeignKey("payment_methods.id"))
+    frequency: Mapped[str] = mapped_column(
+        String(20), default=FREQUENCY_MONTHLY, server_default=FREQUENCY_MONTHLY
+    )
+    day_of_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    start_date: Mapped[dt.date] = mapped_column(Date)
+    end_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    last_generated_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class AuditLog(Base):
+    """Log audit dan riwayat perubahan entitas transaksi (V2)."""
+
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        CheckConstraint(_in("action", AUDIT_ACTIONS), name="action_valid"),
+        CheckConstraint("length(trim(action)) > 0", name="action_not_blank"),
+        CheckConstraint("length(trim(entity_type)) > 0", name="entity_type_not_blank"),
+        Index("ix_audit_log_user_created", "user_id", "created_at"),
+        Index("ix_audit_log_user_entity", "user_id", "entity_type", "entity_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    action: Mapped[str] = mapped_column(String(20))
+    entity_type: Mapped[str] = mapped_column(String(50))
+    entity_id: Mapped[int] = mapped_column(Integer)
+    old_values: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_values: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_undone: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class QuickAlias(Base):
+    """Tabel alias input cepat untuk kategori dan metode pembayaran (V2)."""
+
+    __tablename__ = "quick_aliases"
+    __table_args__ = (
+        UniqueConstraint("user_id", "alias", name="uq_quick_aliases_user_id_alias"),
+        CheckConstraint("length(trim(alias)) > 0", name="alias_not_blank"),
+        CheckConstraint(_in("target_type", ALIAS_TARGET_TYPES), name="target_type_valid"),
+        CheckConstraint(
+            "(target_type = 'category' AND category_id IS NOT NULL AND method_id IS NULL) "
+            "OR (target_type = 'payment_method' AND method_id IS NOT NULL "
+            "AND category_id IS NULL)",
+            name="alias_target_match",
+        ),
+        Index("ix_quick_aliases_user_alias", "user_id", "alias"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    alias: Mapped[str] = mapped_column(String(50))
+    target_type: Mapped[str] = mapped_column(String(20))
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    method_id: Mapped[int | None] = mapped_column(ForeignKey("payment_methods.id"), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class ReminderSetting(Base):
+    """Pengaturan pengingat harian dan ringkasan otomatis pengguna (V2)."""
+
+    __tablename__ = "reminder_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_reminder_settings_user_id"),
+        CheckConstraint("length(trim(daily_time)) = 5", name="ck_reminder_settings_time_format"),
+        Index("ix_reminder_settings_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    is_daily_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    daily_time: Mapped[str] = mapped_column(String(5), default="20:00", server_default="20:00")
+    is_weekly_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    is_monthly_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    last_daily_sent: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    last_weekly_sent: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    last_monthly_sent: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class Invite(Base):
+    """Kode undangan registrasi pengguna baru (V3)."""
+
+    __tablename__ = "invites"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_invites_code"),
+        CheckConstraint("length(trim(code)) > 0", name="code_not_blank"),
+        CheckConstraint(
+            "(is_used = true AND used_by_user_id IS NOT NULL) "
+            "OR (is_used = false AND used_by_user_id IS NULL)",
+            name="used_consistency",
+        ),
+        Index("ix_invites_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    code: Mapped[str] = mapped_column(String(50))
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    used_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+    used_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class UserSetting(Base):
+    """Pengaturan zona waktu dan jadwal notifikasi per pengguna (V3)."""
+
+    __tablename__ = "user_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_user_settings_user_id"),
+        CheckConstraint("length(trim(timezone)) > 0", name="ck_user_settings_tz_not_blank"),
+        CheckConstraint("length(trim(daily_time)) = 5", name="ck_user_settings_time_format"),
+        Index("ix_user_settings_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    timezone: Mapped[str] = mapped_column(
+        String(50), default=config.TIMEZONE_NAME, server_default=config.TIMEZONE_NAME
+    )
+    is_daily_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    daily_time: Mapped[str] = mapped_column(String(5), default="20:00", server_default="20:00")
+    is_recurring_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    is_weekly_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    is_monthly_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class SentNotification(Base):
+    """Catatan idempotensi pengiriman notifikasi terjadwal per periode pengguna (V3)."""
+
+    __tablename__ = "sent_notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "notification_type",
+            "period_key",
+            name="uq_sent_notifications_user_type_period",
+        ),
+        CheckConstraint(
+            _in("notification_type", NOTIFICATION_TYPES),
+            name="ck_sent_notifications_type_valid",
+        ),
+        CheckConstraint(
+            "length(trim(period_key)) > 0",
+            name="ck_sent_notifications_period_not_blank",
+        ),
+        Index("ix_sent_notifications_user_type", "user_id", "notification_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    notification_type: Mapped[str] = mapped_column(String(30))
+    period_key: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)

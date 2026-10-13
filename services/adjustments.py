@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from database import queries
 from database.balances import method_balances
-from models import TYPE_ADJUSTMENT, Transaction
+from models import ACTION_CREATE, TYPE_ADJUSTMENT, Transaction
+from services import audit
 from services.common import (
     balance_snapshot,
     negative_balance_warnings,
@@ -67,6 +68,16 @@ def adjust_balance(
         note=note,
     )
     session.add(tx)
+    session.flush()
+    audit.record_audit_log(
+        session,
+        user_id,
+        action=ACTION_CREATE,
+        entity_type="transaction",
+        entity_id=tx.id,
+        new_values=audit._snapshot_transaction(tx),
+        description=f"Koreksi saldo {method.name}: selisih Rp{difference:,}",
+    )
     # Saldo per tanggal koreksi pasti >= 0, tetapi transaksi bertanggal setelahnya
     # bisa membuat saldo keseluruhan tetap minus; itu diberi peringatan.
     warnings = negative_balance_warnings(session, user_id, before, [method.id])

@@ -6,11 +6,12 @@ cukup menampilkan `message`, sedangkan `code` dipakai untuk logika/tes.
 
 from dataclasses import dataclass, field
 
-from models import OpeningBalance, Transaction
+from models import AuditLog, OpeningBalance, Transaction
 
 # Kode peringatan
 NEGATIVE_BALANCE = "negative_balance"
 BEFORE_OPENING_DATE = "before_opening_date"
+NEWER_ADJUSTMENT = "newer_adjustment"
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,16 @@ class AdjustmentResult:
     previous_balance: int
     actual_balance: int
     difference: int
+    warnings: list[ServiceWarning] = field(default_factory=list)
+
+
+@dataclass
+class UndoResult:
+    """Hasil pembatalan aksi (undo)."""
+
+    audit_log: AuditLog
+    transaction: Transaction | None = None
+    action_undone: str = ""
     warnings: list[ServiceWarning] = field(default_factory=list)
 
 

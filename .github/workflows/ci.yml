@@ -11,16 +11,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: Security audit dependencies (pip-audit)
+        run: |
+          pip-audit -r requirements.txt
 
       - name: Run Ruff (lint & format check)
         run: |
@@ -37,3 +42,7 @@ jobs:
           rm -f data/ci_empty.db
           DB_PATH=data/ci_empty.db alembic upgrade head
           DB_PATH=data/ci_empty.db alembic check
+
+      - name: Build Docker image
+        run: |
+          docker build -t personal-expense-tracker:ci .

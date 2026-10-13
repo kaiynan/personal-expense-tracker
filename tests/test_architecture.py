@@ -25,6 +25,16 @@ SERVICE_MODULES = (
     "services.opening_balances",
     "services.adjustments",
     "services.balances",
+    "services.categories",
+    "services.budgets",
+    "services.dashboard",
+    "services.recurring",
+    "services.backup",
+    "services.audit",
+    "services.aliases",
+    "services.reminders",
+    "services.export",
+    "services.users",
 )
 
 RAW_SQL = re.compile(
