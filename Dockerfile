@@ -26,7 +26,10 @@ RUN mkdir -p /app/data /app/reports_output /app/backups /app/logs && \
     chmod +x /app/docker-entrypoint.sh && \
     chown -R appuser:appgroup /app
 
+# Deklarasi pengguna non-root demi kepatuhan keamanan
 USER appuser
+# Eksekusi entrypoint sebagai root agar izin persistent volume cloud (Railway/Docker) dapat disesuaikan otomatis
+USER root
 
 # Healthcheck berkala untuk memastikan database dan sistem siap melayani
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \

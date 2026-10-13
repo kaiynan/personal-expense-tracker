@@ -10,8 +10,10 @@ set -e
 
 echo "🚀 [entrypoint] Memulai inisialisasi container..."
 
-# Pastikan folder data, backups, logs, dan reports_output ada
-mkdir -p data backups logs reports_output
+# Pastikan folder data, backups, logs, dan reports_output ada dan memiliki izin tulis penuh
+mkdir -p /app/data /app/backups /app/logs /app/reports_output data backups logs reports_output
+chmod -R 777 /app/data /app/backups /app/logs /app/reports_output data backups logs reports_output 2>/dev/null || true
+chown -R appuser:appgroup /app/data /app/backups /app/logs /app/reports_output data backups logs reports_output 2>/dev/null || true
 
 # 1. Backup otomatis database sebelum migrasi
 echo "💾 [entrypoint] Menjalankan pencadangan pra-migrasi..."

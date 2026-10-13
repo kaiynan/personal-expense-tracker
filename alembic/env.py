@@ -45,6 +45,7 @@ def _configure_and_run(connection) -> None:
 
 def run_migrations_offline() -> None:
     """Hasilkan SQL tanpa koneksi (alembic upgrade --sql)."""
+    app_config.ensure_directories()
     context.configure(
         url=_database_url(),
         target_metadata=target_metadata,
@@ -58,6 +59,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Jalankan migrasi pada database sungguhan."""
+    app_config.ensure_directories()
     injected = alembic_config.attributes.get("connection")
     if injected is not None:
         _configure_and_run(injected)

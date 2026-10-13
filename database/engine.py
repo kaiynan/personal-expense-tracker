@@ -28,6 +28,16 @@ def create_db_engine(url: str | None = None) -> Engine:
         url: URL database; default `config.DATABASE_URL`.
     """
     url = url or config.DATABASE_URL
+    if url.startswith("sqlite:///"):
+        raw_path = url[len("sqlite:///") :]
+        if raw_path and not raw_path.startswith(":memory:"):
+            from pathlib import Path
+
+            db_dir = Path(raw_path).parent
+            try:
+                db_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as exc:
+                logger.warning("Gagal membuat direktori database %s: %s", db_dir, exc)
     engine = create_engine(url)
     if engine.dialect.name == "sqlite":
         _configure_sqlite(engine)
@@ -57,12 +67,13 @@ def _restrict_file_permissions(engine: Engine) -> None:
     database = engine.url.database
     if os.name != "posix" or database in (None, "", ":memory:"):
         return
-    with engine.connect():  # memastikan file sudah dibuat
-        pass
     try:
-        os.chmod(database, 0o600)
-    except OSError:
-        logger.warning("Tidak bisa mengatur izin file database: %s", database)
+        with engine.connect():  # memastikan file sudah dibuat
+            pass
+        if os.path.isfile(database):
+            os.chmod(database, 0o600)
+    except Exception as exc:
+        logger.warning("Tidak bisa mengatur izin file database: %s (%s)", database, exc)
 
 
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:
