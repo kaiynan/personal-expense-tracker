@@ -48,19 +48,31 @@ def check_database_health() -> bool:
 
 
 def run_healthcheck() -> bool:
-    """Jalankan healthcheck: utamakan HTTP /health, fallback ke database."""
+    """Jalankan healthcheck: pastikan database sehat dan endpoint /health (jika aktif)."""
+    # 1. Pastikan integritas dan konektivitas basis data berfungsi
+    if not check_database_health():
+        return False
+
     port_str = os.environ.get("PORT", "8000")
     try:
         port = int(port_str)
     except ValueError:
         port = 8000
 
-    # Coba HTTP /health terlebih dahulu
-    if check_http_health(port):
+    # 2. Jika HTTP port terbuka, pastikan statusnya healthy
+    # Jika koneksi ditolak (mode bot murni), konektivitas database di atas sudah mencukupi
+    url = f"http://127.0.0.1:{port}/health"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "DockerHealthcheck/1.0"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status != 200:
+                return False
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("status") == "healthy"
+    except (urllib.error.URLError, TimeoutError, ConnectionRefusedError, OSError):
         return True
-
-    # Fallback jika container dijalankan mode bot murni (--bot)
-    return check_database_health()
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":
