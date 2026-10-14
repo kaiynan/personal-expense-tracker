@@ -1,5 +1,5 @@
 # Gunakan base image Python 3.12 slim yang stabil dan ringan untuk efisiensi resource
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Variabel lingkungan standar Python & Matplotlib headless
 ENV PYTHONDONTWRITEBYTECODE=1 \
