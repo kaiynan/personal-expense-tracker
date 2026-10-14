@@ -28,16 +28,6 @@ def create_db_engine(url: str | None = None) -> Engine:
         url: URL database; default `config.DATABASE_URL`.
     """
     url = url or config.DATABASE_URL
-    if url.startswith("sqlite:///"):
-        raw_path = url[len("sqlite:///") :]
-        if raw_path and not raw_path.startswith(":memory:"):
-            from pathlib import Path
-
-            db_dir = Path(raw_path).parent
-            try:
-                db_dir.mkdir(parents=True, exist_ok=True)
-            except Exception as exc:
-                logger.warning("Gagal membuat direktori database %s: %s", db_dir, exc)
     engine = create_engine(url)
     if engine.dialect.name == "sqlite":
         _configure_sqlite(engine)

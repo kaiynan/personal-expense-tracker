@@ -1,12 +1,14 @@
 ### Peran
-Kamu adalah senior Python developer yang membantu saya membangun **Personal Expense Tracker**, aplikasi pengelolaan keuangan pribadi dengan dua antarmuka: **program Python (CLI)** dan **Telegram Bot**, berbagi satu database **SQLite**. Saya mahasiswa, jadi tulis kode yang bersih, mudah dibaca, diberi docstring singkat, dan jelaskan keputusan penting dengan ringkas.
+Kamu adalah senior Python developer yang membantu saya membangun **Personal Expense Tracker**, aplikasi pengelolaan keuangan pribadi dengan tiga antarmuka: **program Python (CLI)**, **Telegram Bot**, dan **Web Dashboard**, berbagi satu database **SQLite**. Saya mahasiswa, jadi tulis kode yang bersih, mudah dibaca, diberi docstring singkat, dan jelaskan keputusan penting dengan ringkas.
 
 ### Tech stack
 - Python 3.11+
 - **SQLAlchemy 2.x** (model ORM + query agregat eksplisit) dengan **Alembic** untuk migrasi. SQLite dulu, tetapi kode **tidak boleh memakai fitur khusus SQLite** agar bisa pindah ke PostgreSQL. Query selalu berparameter.
 - Docker + docker-compose dan GitHub Actions (lint, pytest, build image) sebagai fase tersendiri
 - `python-telegram-bot` v20+ (async)
-- `matplotlib` dengan backend `Agg`
+- `matplotlib` dengan backend `Agg` (tetap dipakai untuk pengiriman foto chart di Telegram Bot)
+- **Backend Web (Fase W):** `fastapi`, `uvicorn[standard]`, `jinja2`, `python-multipart`, `itsdangerous`
+- **Frontend Web (via CDN, tanpa Node.js/npm):** **Tailwind CSS**, **HTMX**, dan **Chart.js** (untuk grafik interaktif di web)
 - `openpyxl` (export Excel), `fpdf2` (export PDF), `python-dotenv`
 - `pytest` untuk pengujian
 - **Jangan** memakai pandas (hemat RAM; target deploy server kecil/VPS dan kemungkinan dipakai publik)
@@ -28,12 +30,12 @@ Kamu adalah senior Python developer yang membantu saya membangun **Personal Expe
 
 ### Arsitektur
 Berlapis dan tidak boleh dilanggar:
-`interface (cli / bot)  →  services (logika bisnis)  →  database (query)`
-- Tidak ada SQL di `cli/` dan `bot/`.
-- Tidak ada logika bisnis di handler Telegram atau menu CLI. Keduanya hanya memanggil `services/`.
+`interface (cli / bot / web)  →  services (logika bisnis)  →  database (query)`
+- Tidak ada SQL di `cli/`, `bot/`, dan `web/`.
+- Tidak ada logika bisnis di handler Telegram, menu CLI, atau route Web. Ketiganya hanya memanggil `services/`.
 - Fungsi perhitungan (saldo, budget, laporan) dibuat sebisa mungkin murni dan mudah dites.
 - Tidak ada variabel global untuk state. Konfigurasi hanya lewat `config.py`.
-- `services/` bersifat **sinkron** (dipakai bersama CLI dan bot). Bot memanggilnya lewat `asyncio.to_thread` agar event loop tidak terblokir. Session database dibuat per operasi (`session_scope`), bukan global.
+- `services/` bersifat **sinkron** (dipakai bersama CLI, bot, dan web). Bot memanggilnya lewat `asyncio.to_thread` agar event loop tidak terblokir, dan route FastAPI mendefinisikannya dengan `def` biasa atau memanggilnya lewat `asyncio.to_thread`. Session database dibuat per operasi (`session_scope`), bukan global.
 - Setiap query data pengguna **wajib** memakai `user_id`. Ada tes isolasi antar pengguna.
 
 ### Struktur folder
@@ -48,6 +50,7 @@ personal_expense_tracker/
 ├── charts/
 ├── cli/             # menu terminal
 ├── bot/             # handler Telegram
+├── web/             # visual Web Dashboard (FastAPI, template, router)
 ├── utils/           # validasi, format rupiah, tanggal
 ├── tests/
 ├── alembic/         # skrip migrasi (Alembic)
@@ -99,7 +102,26 @@ Kategori default pemasukan: Gaji, Uang Saku, Beasiswa, Bonus, Freelance, Penjual
 **Keamanan dan ketahanan:** PIN untuk CLI, backup terenkripsi.
 
 ### Di luar cakupan
-Dashboard web, multi-mata uang, integrasi bank/e-wallet, aplikasi mobile, target tabungan, utang/piutang.
+Multi-mata uang, integrasi bank/e-wallet, aplikasi mobile, target tabungan, utang/piutang.
+
+### Fitur Fase W (Web Dashboard)
+Antarmuka web interaktif berbasis FastAPI, Jinja2, Tailwind CSS, HTMX, dan Chart.js yang terintegrasi dengan backend dan database yang sama:
+- **Autentikasi & Keamanan:** Login via `telegram_id` dengan verifikasi OTP 6 digit yang dikirimkan melalui Telegram Bot (berlaku 5 menit). Sesi web aman berbasis signed cookie (`itsdangerous`).
+- **Dashboard Interaktif:** Ringkasan metrik keuangan (Total Saldo, Pemasukan, Pengeluaran, Net Cashflow, Budget Progress, dan Runway) diperbarui secara real-time.
+- **Visualisasi Interaktif (Chart.js):** Donut chart pengeluaran per kategori, bar chart pemasukan vs pengeluaran, dan visualisasi interaktif lainnya di browser.
+- **Pencatatan Cepat & Multi-Tab:** Input transaksi via Quick-Action Bar dengan preview konfirmasi HTMX, serta modal/bottom-sheet dengan 4 tab: Pengeluaran, Pemasukan, Transfer (+ Biaya Admin), dan Input Cepat.
+- **Riwayat Mutasi Responsif:** Tampilan tabel lengkap di desktop dan kartu mutasi per tanggal ala M-Banking di layar ponsel.
+- **Feedback & Notifikasi:** Toast sukses melayang auto-dismiss (3 detik), serta toast peringatan (`warnings` saldo minus/sebelum opening balance) dan error yang persisten dengan tombol tutup manual.
+
+### Panduan Desain UI/UX Web (Wajib Dipatuhi di Semua Halaman `web/`)
+- **Tema Adaptif (Light + Dark Mode):** Gunakan Tailwind CSS dengan `darkMode: 'class'`. Sediakan tombol toggle (☀️/🌙) yang menyimpan preferensi di `localStorage` (`slate-50`/`white` untuk mode terang, `slate-950`/`slate-900` untuk mode gelap, dengan warna aksen `emerald-600` dan `indigo-600`).
+- **Navigasi Hybrid App-Like:** Gunakan **Sidebar Kiri** pada layar desktop (`md:flex`) dan **Bottom Navigation Bar** menempel di bawah layar pada HP (`md:hidden`) dengan 5 item: *Dashboard, Riwayat, Tombol `+` (Tengah Menonjol), Analitik, Lainnya*.
+- **UX Pencatatan Transaksi:**
+  (a) Sediakan **Quick-Action Bar** di bagian atas halaman Dashboard untuk input cepat (`makan 15000 gopay`) dengan pratinjau konfirmasi HTMX.
+  (b) Klik tombol `+` membuka **Pop-up Modal** (di desktop) atau **Bottom Sheet Drawer** (di HP) tanpa pindah halaman, berisi 4 tab: *Pengeluaran | Pemasukan | Transfer (+ Biaya Admin) | Input Cepat*.
+- **Tampilan Riwayat Responsif Otomatis:** Pada layar desktop tampil sebagai **Tabel Lengkap** (`hidden md:table`), sedangkan pada layar HP (`block md:hidden`) otomatis tampil sebagai **Kartu Mutasi M-Banking** yang dikelompokkan per tanggal (*Hari Ini*, *Kemarin*, dst.) dengan warna nominal: hijau (`+Rp...`) untuk pemasukan, merah (`-Rp...`) untuk pengeluaran, biru (`⇄ Rp...`) untuk transfer, serta badge khusus untuk Biaya Admin dan Koreksi Saldo (`adjustment`).
+- **Toast Melayang untuk `warnings` & Notifikasi:** Gunakan sistem toast melayang di pojok layar (via HTMX `hx-swap-oob`). Toast sukses (hijau) hilang otomatis dalam 3 detik. Toast `warnings` dari `services/` (kuning/oranye, seperti peringatan saldo metode minus atau tanggal transaksi sebelum `effective_date`) dan `error` (merah) **tidak boleh hilang otomatis** dan wajib memiliki tombol tutup (`×`) manual.
+- **Kenyamanan Visual (Privacy Toggle & Live Rupiah Input):** Sediakan tombol mata (👁️) untuk menyensor seluruh nominal saldo menjadi `Rp •••••••` (disimpan di `localStorage`). Semua input nominal otomatis menampilkan pemisah titik ribuan (`1.350.000`) saat diketik, namun mengirimkan bilangan bulat murni (`1350000`) ke backend.
 
 ### Pengujian (pytest, SQLite in-memory)
 Minimal mencakup:
@@ -122,6 +144,10 @@ Minimal mencakup:
 - Persentase budget dihitung dengan integer (`terpakai * 100 // budget`), bukan float.
 - Waktu `created_at`/`updated_at` disimpan sebagai UTC; tanggal transaksi mengikuti zona waktu pengguna.
 - Docker, docker-compose, dan CI/CD dikerjakan sebagai fase tersendiri.
+15. **Arsitektur Berlapis Web:** `interface (cli / bot / web) → services (logika bisnis, sinkron) → database (query SQLAlchemy)`. Dilarang menulis SQL mentah atau mengakses `Session` secara langsung di dalam folder `web/`. Semua route di `web/` wajib memanggil `services/` lewat `session_scope` dan memfilter dengan `user_id`.
+16. **Pemanggilan Sinkron di FastAPI:** Karena `services/` bersifat sinkron, route FastAPI yang mengakses database didefinisikan dengan `def` biasa atau dipanggil lewat `asyncio.to_thread` agar event loop tidak terblokir.
+17. **Autentikasi OTP via `telegram_id`:** Pengguna login di web dengan memasukkan angka `telegram_id` mereka. Sistem memvalidasi bahwa pengguna ada dan berstatus `active` (tolak `pending` atau `blocked`), lalu mengirimkan kode OTP 6 digit (berlaku 5 menit) melalui Telegram Bot.
+18. **Satu Container di Railway (`FastAPI lifespan`):** Di `Dockerfile` (`python:3.12-slim`), setelah menjalankan `alembic upgrade head`, aplikasi menjalankan `uvicorn` yang menyalakan FastAPI sekaligus menjalankan `python-telegram-bot` (beserta `JobQueue` scheduler) di dalam satu proses `lifespan` agar berbagi volume SQLite `data/` yang sama.
 
 ### Cara kerja kamu
 - Kerjakan **satu fase per permintaan**. Jangan menambah fitur di luar brief.
