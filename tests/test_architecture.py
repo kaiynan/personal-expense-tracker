@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_DIRS = ("services", "utils", "cli", "bot", "reports", "charts")
+APP_DIRS = ("services", "utils", "cli", "bot", "reports", "charts", "web")
 APP_FILES = ("main.py", "config.py")
 
 SERVICE_MODULES = (
@@ -101,3 +101,21 @@ def test_every_service_function_has_isolation_test(fn):
         encoding="utf-8"
     )
     assert re.search(rf"\b{fn.__name__}\(", source), f"{fn.__name__} belum punya tes isolasi"
+
+
+def _web_sources() -> list[Path]:
+    return sorted((ROOT / "web").rglob("*.py"))
+
+
+@pytest.mark.parametrize("path", _web_sources(), ids=lambda p: str(p.relative_to(ROOT)))
+def test_no_direct_session_instantiation_in_web(path):
+    """Pastikan seluruh route dan helper di web/ tidak menginstansiasi Session() langsung."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+            assert name != "Session", (
+                f"Pembuatan Session() langsung dilarang di {path.name}; "
+                f"wajib gunakan session_scope(factory)."
+            )

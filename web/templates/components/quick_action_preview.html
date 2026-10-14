@@ -1,0 +1,64 @@
+<!-- Quick-Action Confirmation Preview Card (Fase W2) -->
+<div id="quick-action-container" class="bg-white dark:bg-slate-900 rounded-2xl p-5 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-md transition-all">
+  <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+    <div class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <h3 class="text-sm font-bold text-slate-900 dark:text-white">Konfirmasi Input Cepat</h3>
+    </div>
+    <span class="text-xs px-2.5 py-1 rounded-full font-semibold {% if parsed.type == 'income' %}bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400{% else %}bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400{% endif %}">
+      {% if parsed.type == 'income' %}Pemasukan{% else %}Pengeluaran{% endif %}
+    </span>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 py-1">
+    <div>
+      <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Nominal</span>
+      <p class="text-base font-black text-slate-900 dark:text-white mt-0.5" data-balance>{{ nominal_display }}</p>
+    </div>
+    <div>
+      <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Kategori</span>
+      <p class="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">{{ parsed.category_name }}</p>
+    </div>
+    <div>
+      <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Metode</span>
+      <p class="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">{{ parsed.method_name }}</p>
+    </div>
+    <div>
+      <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Tanggal</span>
+      <p class="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">{{ date_display }}</p>
+    </div>
+  </div>
+
+  {% if parsed.note %}
+  <div class="mt-3 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+    <span class="font-semibold text-slate-700 dark:text-slate-300">Keterangan:</span> {{ parsed.note }}
+  </div>
+  {% endif %}
+
+  <div class="flex items-center justify-end gap-2.5 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+    <button
+      type="button"
+      hx-post="/quick-action/cancel"
+      hx-target="#quick-action-container"
+      hx-swap="outerHTML"
+      class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium text-sm transition-all cursor-pointer"
+    >
+      Batal
+    </button>
+
+    <form hx-post="/quick-action/confirm" hx-target="#quick-action-container" hx-swap="outerHTML">
+      <input type="hidden" name="type" value="{{ parsed.type }}">
+      <input type="hidden" name="amount" value="{{ parsed.amount }}">
+      <input type="hidden" name="category_id" value="{{ parsed.category_id }}">
+      <input type="hidden" name="method_id" value="{{ parsed.method_id }}">
+      <input type="hidden" name="note" value="{{ parsed.note or '' }}">
+      <button
+        type="submit"
+        class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span>Simpan</span>
+      </button>
+    </form>
+  </div>
+</div>

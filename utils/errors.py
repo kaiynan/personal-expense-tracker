@@ -4,6 +4,10 @@
 class AppError(Exception):
     """Induk semua error yang sengaja dilempar aplikasi."""
 
+    @property
+    def message(self) -> str:
+        return str(self)
+
 
 class ValidationError(AppError, ValueError):
     """Input tidak valid (nominal, tanggal, keterangan, kategori, metode, ...)."""

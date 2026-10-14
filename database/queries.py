@@ -35,6 +35,7 @@ from models import (
     Transaction,
     User,
     UserSetting,
+    WebLoginOtp,
     WeeklyBudget,
 )
 
@@ -150,6 +151,16 @@ def list_methods(session: Session, user_id: int) -> list[PaymentMethod]:
     )
 
 
+def get_method_by_name(session: Session, user_id: int, name: str) -> PaymentMethod | None:
+    """Ambil metode pembayaran milik `user_id` berdasarkan nama (case-insensitive)."""
+    return session.scalars(
+        select(PaymentMethod).where(
+            PaymentMethod.user_id == user_id,
+            func.lower(PaymentMethod.name) == func.lower(name.strip()),
+        )
+    ).first()
+
+
 def get_category(session: Session, user_id: int, category_id: int) -> Category | None:
     """Ambil kategori milik `user_id`."""
     return session.scalars(
@@ -236,6 +247,8 @@ def list_transactions(
     keyword: str | None = None,
     include_deleted: bool = False,
     limit: int | None = None,
+    min_amount: int | None = None,
+    max_amount: int | None = None,
 ) -> list[Transaction]:
     """Daftar transaksi milik `user_id`, terbaru lebih dulu.
 
@@ -248,6 +261,8 @@ def list_transactions(
             nama kategori. Karakter `%` dan `_` diperlakukan sebagai teks biasa.
         include_deleted: ikut sertakan transaksi yang sudah dihapus (soft delete).
         limit: batas jumlah baris.
+        min_amount: batas nominal minimum (inklusif).
+        max_amount: batas nominal maksimum (inklusif).
     """
     t, c = Transaction, Category
     stmt = (
@@ -269,6 +284,10 @@ def list_transactions(
         stmt = stmt.where(t.date >= start)
     if end is not None:
         stmt = stmt.where(t.date <= end)
+    if min_amount is not None:
+        stmt = stmt.where(func.abs(t.amount) >= min_amount)
+    if max_amount is not None:
+        stmt = stmt.where(func.abs(t.amount) <= max_amount)
     if keyword:
         stmt = stmt.where(
             or_(
@@ -885,7 +904,12 @@ def delete_user_permanently(session: Session, user_id: int) -> None:
         inv.is_used = False
     session.flush()
 
-    # 6. Hapus entitas pengguna
+    # 6. OTP login web
+    for otp in session.scalars(select(WebLoginOtp).where(WebLoginOtp.user_id == user_id)):
+        session.delete(otp)
+    session.flush()
+
+    # 7. Hapus entitas pengguna
     session.delete(user)
     session.flush()
 
@@ -918,3 +942,55 @@ def count_all_budgets(session: Session) -> int:
 def count_all_recurring(session: Session) -> int:
     """Hitung seluruh transaksi rutin di sistem."""
     return session.query(RecurringTransaction).count()
+
+
+def create_web_login_otp(
+    session: Session,
+    user_id: int,
+    code_hash: str,
+    expires_at: Any,
+) -> WebLoginOtp:
+    """Simpan rekaman kode OTP baru untuk pengguna."""
+    otp = WebLoginOtp(
+        user_id=user_id,
+        code_hash=code_hash,
+        expires_at=expires_at,
+    )
+    session.add(otp)
+    session.flush()
+    return otp
+
+
+def get_latest_active_otp(
+    session: Session,
+    user_id: int,
+    now: Any,
+) -> WebLoginOtp | None:
+    """Ambil kode OTP aktif terbaru untuk user_id yang belum digunakan dan belum kedaluwarsa."""
+    return session.scalars(
+        select(WebLoginOtp)
+        .where(
+            WebLoginOtp.user_id == user_id,
+            WebLoginOtp.used_at.is_(None),
+            WebLoginOtp.expires_at >= now,
+        )
+        .order_by(WebLoginOtp.created_at.desc(), WebLoginOtp.id.desc())
+    ).first()
+
+
+def mark_otp_used(session: Session, otp_id: int, used_at: Any) -> None:
+    """Tandai kode OTP sebagai telah digunakan."""
+    otp = session.get(WebLoginOtp, otp_id)
+    if otp is not None:
+        otp.used_at = used_at
+        session.flush()
+
+
+def count_recent_otps(session: Session, user_id: int, since: Any) -> int:
+    """Hitung jumlah OTP yang dibuat pengguna sejak waktu tertentu untuk rate limiting."""
+    return session.scalars(
+        select(func.count(WebLoginOtp.id)).where(
+            WebLoginOtp.user_id == user_id,
+            WebLoginOtp.created_at >= since,
+        )
+    ).one()

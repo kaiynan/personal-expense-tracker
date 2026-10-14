@@ -1,0 +1,130 @@
+<div class="mt-6 p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 transition-colors">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <div>
+      <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <span>Pratinjau Impor Mutasi ({{ total_rows }} Baris)</span>
+      </h3>
+      {% if duplicate_count > 0 %}
+      <p class="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
+        ⚠️ Terdeteksi {{ duplicate_count }} transaksi serupa pada tanggal & nominal yang sama (diberi tanda duplikat).
+      </p>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        onclick="document.getElementById('import-preview-container').innerHTML = '';"
+        class="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+      >
+        Tutup / Batal
+      </button>
+    </div>
+  </div>
+
+  <form hx-post="/reports/import/confirm" hx-target="#import-preview-container" hx-swap="outerHTML">
+    <div class="overflow-x-auto max-h-96 border border-slate-200 dark:border-slate-800 rounded-xl">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+          <tr>
+            <th class="p-3 text-center w-12">
+              <input type="checkbox" id="check-all-import" checked onchange="toggleSelectAllImport(this)" class="rounded text-emerald-600 focus:ring-emerald-500" />
+            </th>
+            <th class="p-3">Status</th>
+            <th class="p-3">Tanggal</th>
+            <th class="p-3">Jenis</th>
+            <th class="p-3">Nominal (Rp)</th>
+            <th class="p-3">Kategori</th>
+            <th class="p-3">Metode</th>
+            <th class="p-3">Keterangan</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          {% for item in items %}
+          <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors {% if item.is_duplicate %}bg-amber-50/30 dark:bg-amber-950/20{% endif %}">
+            <td class="p-3 text-center">
+              <input
+                type="checkbox"
+                name="selected_rows"
+                value="{{ item.row_id }}"
+                class="import-row-checkbox rounded text-emerald-600 focus:ring-emerald-500"
+                {% if not item.is_duplicate %}checked{% endif %}
+              />
+            </td>
+            <td class="p-3">
+              {% if item.is_duplicate %}
+              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Duplikat?</span>
+              {% else %}
+              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Baru</span>
+              {% endif %}
+            </td>
+            <td class="p-3 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
+              {{ item.date_str }}
+              <input type="hidden" name="date_{{ item.row_id }}" value="{{ item.date_str }}" />
+            </td>
+            <td class="p-3">
+              <select name="type_{{ item.row_id }}" class="px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white">
+                <option value="expense" {% if item.type == 'expense' %}selected{% endif %}>Pengeluaran</option>
+                <option value="income" {% if item.type == 'income' %}selected{% endif %}>Pemasukan</option>
+              </select>
+            </td>
+            <td class="p-3 whitespace-nowrap">
+              <input
+                type="text"
+                name="amount_{{ item.row_id }}"
+                value="{{ item.amount_formatted }}"
+                class="w-28 px-2 py-1 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+              />
+            </td>
+            <td class="p-3">
+              <select name="category_id_{{ item.row_id }}" class="px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white">
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if c.id == item.category_id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="p-3">
+              <select name="method_id_{{ item.row_id }}" class="px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white">
+                {% for m in methods %}
+                <option value="{{ m.id }}" {% if m.id == item.method_id %}selected{% endif %}>{{ m.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="p-3">
+              <input
+                type="text"
+                name="note_{{ item.row_id }}"
+                value="{{ item.note }}"
+                placeholder="Catatan..."
+                class="w-full min-w-[120px] px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+              />
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+      <span class="text-xs text-slate-500 dark:text-slate-400">
+        Centang baris yang valid untuk dimasukkan ke pembukuan.
+      </span>
+      <button
+        type="submit"
+        class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span>Konfirmasi & Simpan Transaksi</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  function toggleSelectAllImport(master) {
+    document.querySelectorAll('.import-row-checkbox').forEach(cb => {
+      cb.checked = master.checked;
+    });
+  }
+</script>

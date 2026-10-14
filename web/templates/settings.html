@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Pengaturan & Keamanan - Personal Expense Tracker{% endblock %}
+{% block header_title %}Pengaturan & Cadangan Data{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-4xl mx-auto">
+  
+  <!-- Header & Info Akun Pengguna -->
+  <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-emerald-500/20">
+        {{ user.name[:2].upper() }}
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">{{ user.name }}</h2>
+          <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+            {{ user.role.upper() }}
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 font-mono mt-0.5">
+          Telegram ID: {{ user.telegram_id }} • ID Pengguna: #{{ user.id }}
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <form action="/auth/logout" method="post">
+        <button
+          type="submit"
+          class="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          <span>Keluar dari Web</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- BAGIAN 1: Zona Waktu & Preferensi Notifikasi Pengingat -->
+  <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-base text-slate-900 dark:text-white">Zona Waktu & Jadwal Pengingat</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Atur zona waktu pembukuan dan waktu pengiriman pesan harian Telegram Bot</p>
+      </div>
+    </div>
+
+    <form hx-post="/settings/preferences" hx-target="#toast-container" hx-swap="beforeend" class="pt-2 space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Zona Waktu -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Zona Waktu Pembukuan</label>
+          <select name="timezone" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="Asia/Jakarta" {% if timezone == 'Asia/Jakarta' %}selected{% endif %}>WIB - Asia/Jakarta (UTC+7)</option>
+            <option value="Asia/Makassar" {% if timezone == 'Asia/Makassar' %}selected{% endif %}>WITA - Asia/Makassar (UTC+8)</option>
+            <option value="Asia/Jayapura" {% if timezone == 'Asia/Jayapura' %}selected{% endif %}>WIT - Asia/Jayapura (UTC+9)</option>
+          </select>
+        </div>
+
+        <!-- Jam Pengingat Harian -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Jam Pengingat Harian (24 Jam)</label>
+          <input
+            type="text"
+            name="daily_time"
+            value="{{ daily_time }}"
+            placeholder="20:00"
+            required
+            pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+          />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+          <input type="checkbox" name="is_daily_active" value="true" class="rounded text-emerald-600 focus:ring-emerald-500" {% if is_daily_active %}checked{% endif %} />
+          <span>Aktifkan pengingat catat pengeluaran harian via Telegram Bot</span>
+        </label>
+
+        <button
+          type="submit"
+          class="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+        >
+          Simpan Preferensi
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- BAGIAN 2: Cek Konsistensi Saldo -->
+  <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-slate-900 dark:text-white">Audit Konsistensi Saldo</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Verifikasi perhitungan query agregat terhadap data transaksi mentah</p>
+        </div>
+      </div>
+
+      <form hx-post="/settings/check-consistency" hx-target="#consistency-container" hx-swap="innerHTML">
+        <button
+          type="submit"
+          class="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Jalankan Audit</span>
+        </button>
+      </form>
+    </div>
+
+    <div id="consistency-container"></div>
+  </div>
+
+  <!-- BAGIAN 3: Cadangan Data (Backup & Restore) -->
+  <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6 transition-colors">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"/></svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-base text-slate-900 dark:text-white">Cadangan & Pemulihan Data</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Ekspor arsip ZIP lengkap (JSON + CSV) dan pulihkan data kapan saja</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+      <!-- Unduh Backup -->
+      <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-3">
+        <div>
+          <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">Unduh Cadangan (ZIP)</h4>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Menghasilkan file arsip .zip berisi manifest, backup.json, dan seluruh file mutasi CSV Anda.
+          </p>
+        </div>
+        <a
+          href="/settings/backup/download"
+          class="w-full py-2 px-4 text-xs font-semibold text-center text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-sm transition-colors"
+        >
+          Unduh Cadangan ZIP
+        </a>
+      </div>
+
+      <!-- Pulihkan Backup -->
+      <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-3">
+        <div>
+          <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">Pulihkan dari Cadangan</h4>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Unggah file arsip .zip atau .json cadangan Anda. Data lama akan digantikan dengan data cadangan.
+          </p>
+        </div>
+
+        <form
+          hx-post="/settings/backup/restore"
+          hx-target="#toast-container"
+          hx-swap="beforeend"
+          enctype="multipart/form-data"
+          class="flex items-center gap-2"
+          onsubmit="return confirm('Peringatan: Pemulihan data akan mengganti data pembukuan Anda saat ini dengan isi file cadangan. Lanjutkan?')"
+        >
+          <input
+            type="file"
+            name="file"
+            accept=".zip,.json"
+            required
+            class="w-full text-[11px] text-slate-500 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-950 dark:file:text-purple-300 cursor-pointer"
+          />
+          <button
+            type="submit"
+            class="px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors cursor-pointer flex-shrink-0"
+          >
+            Pulihkan
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- BAGIAN 4: Hapus Akun Pengguna (Zona Bahaya) -->
+  <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-rose-200 dark:border-rose-900/60 shadow-sm space-y-4 transition-colors">
+    <div class="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+      <div class="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/60 flex items-center justify-center font-bold">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-base text-rose-600 dark:text-rose-400">Zona Bahaya: Hapus Akun & Data</h3>
+        <p class="text-xs text-rose-500/80 dark:text-rose-400/70">Tindakan ini tidak dapat dibatalkan</p>
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+      Menghapus akun Anda akan menghapus seluruh data transaksi, riwayat saldo, anggaran, kategori kustom, serta pengaturan secara permanen dari server. Biaya admin turunan akan dihapus dengan aman terlebih dahulu untuk menjaga integritas basis data.
+    </p>
+
+    <div class="pt-2">
+      <button
+        type="button"
+        onclick="document.getElementById('delete-modal').classList.remove('hidden')"
+        class="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+      >
+        Hapus Akun Saya Secara Permanen
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Konfirmasi Hapus Akun Berlapis -->
+<div id="delete-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+    <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-950/80 dark:text-rose-400 flex items-center justify-center mx-auto">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+
+    <div class="text-center space-y-1">
+      <h3 class="text-base font-bold text-slate-900 dark:text-white">Konfirmasi Penghapusan Akun</h3>
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        Seluruh data keuangan Anda akan dimusnahkan. Untuk melanjutkan, ketik kata <strong class="text-rose-600 font-mono">HAPUS</strong> pada kolom di bawah ini:
+      </p>
+    </div>
+
+    <form hx-post="/settings/account/delete" hx-target="#toast-container" hx-swap="beforeend" class="space-y-4">
+      <input
+        type="text"
+        name="confirm_text"
+        placeholder="Ketik HAPUS"
+        required
+        autocomplete="off"
+        class="w-full px-3 py-2 text-center text-sm font-mono font-bold tracking-widest bg-slate-50 dark:bg-slate-800 border border-rose-300 dark:border-rose-800 rounded-xl text-rose-600 dark:text-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500 uppercase"
+      />
+
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          onclick="document.getElementById('delete-modal').classList.add('hidden')"
+          class="flex-1 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+        >
+          Batal
+        </button>
+
+        <button
+          type="submit"
+          class="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+        >
+          Hapus Permanen
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

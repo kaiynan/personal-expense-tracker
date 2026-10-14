@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+
+{% block title %}Panel Administrator - Personal Expense Tracker{% endblock %}
+{% block header_title %}Panel Administrator{% endblock %}
+
+{% block content %}
+<div id="admin-content" hx-trigger="adminUpdated from:body" hx-get="/admin" hx-select="#admin-content" hx-target="#admin-content" hx-swap="outerHTML" class="space-y-6">
+
+  <!-- Header Banner & Backup Button -->
+  <div class="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold uppercase tracking-wider mb-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <span>Superuser & Operasional Sistem</span>
+      </div>
+      <h2 class="text-xl md:text-2xl font-black">Pusat Kendali Administrator</h2>
+      <p class="text-xs md:text-sm text-purple-100 mt-1 max-w-xl">
+        Kelola akses pengguna, pantau integritas database SQLite, kelola kode undangan pendaftaran, dan amankan cadangan data penuh.
+      </p>
+    </div>
+
+    <!-- Tombol Unduh Full Backup -->
+    <div class="flex-shrink-0">
+      <a
+        href="/admin/backup/download"
+        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm bg-white text-purple-800 hover:bg-purple-50 shadow-md transition-all active:scale-95"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span>Unduh Backup Penuh (.zip)</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Metric Badges -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+    <!-- Total Pengguna -->
+    <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Pengguna</span>
+        <span class="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 dark:text-white mt-2">{{ metrics.total_users }}</p>
+      <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+        <span class="text-emerald-600 font-semibold">{{ metrics.active_users }} aktif</span> •
+        <span class="text-amber-600 font-semibold">{{ metrics.pending_users }} pending</span> •
+        <span class="text-rose-600 font-semibold">{{ metrics.blocked_users }} blokir</span>
+      </div>
+    </div>
+
+    <!-- Total Transaksi -->
+    <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Transaksi</span>
+        <span class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 dark:text-white mt-2">{{ metrics.total_transactions }}</p>
+      <p class="text-[11px] text-slate-500 mt-1">Di seluruh akun terdaftar</p>
+    </div>
+
+    <!-- Total Anggaran & Rutin -->
+    <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Budget & Rutin</span>
+        <span class="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 dark:text-white mt-2">{{ metrics.total_budgets }} <span class="text-sm font-normal text-slate-400">/ {{ metrics.total_recurring }} rutin</span></p>
+      <p class="text-[11px] text-slate-500 mt-1">Rule & jadwal aktif</p>
+    </div>
+
+    <!-- Integritas SQLite -->
+    <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Integritas Basis Data</span>
+        <span class="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7M4 7c0-2 1.5-3 3.5-3h9c2 0 3.5 1 3.5 3M4 7h16m-8 4v6m-4-3h8"/></svg>
+        </span>
+      </div>
+      <div class="flex items-center gap-2 mt-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if system_status.integrity == 'ok' %}bg-emerald-500 animate-pulse{% else %}bg-rose-500{% endif %}"></span>
+        <p class="text-lg font-bold text-slate-900 dark:text-white uppercase">{{ system_status.integrity }}</p>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-1">{{ system_status.db_size_kb }} • {{ system_status.journal_mode.upper() }} mode</p>
+    </div>
+  </div>
+
+  <!-- Operational Diagnostics Card (Mirip /status Bot) -->
+  <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 transition-colors">
+    <div class="flex items-center gap-2.5 mb-4">
+      <div class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Status Operasional & Lingkungan Server</h3>
+        <p class="text-xs text-slate-500">Informasi runtime Python, zona waktu server, lokasi SQLite, dan backup terbaru.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-slate-400 block mb-1">Waktu Server & Zona Waktu</span>
+        <p class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ system_status.time }}</p>
+        <p class="text-[11px] text-slate-500">{{ system_status.timezone }}</p>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-slate-400 block mb-1">Platform & Versi Python</span>
+        <p class="font-semibold text-slate-800 dark:text-slate-200">Python {{ system_status.python_version }}</p>
+        <p class="text-[11px] text-slate-500 truncate" title="{{ system_status.platform }}">{{ system_status.platform }}</p>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-slate-400 block mb-1">Lokasi File Database SQLite</span>
+        <p class="font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate" title="{{ system_status.db_path }}">{{ system_status.db_path }}</p>
+        <p class="text-[11px] text-slate-500">Ukuran: {{ system_status.db_size_kb }}</p>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-slate-400 block mb-1">Cadangan Terakhir Tersedia</span>
+        <p class="font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate" title="{{ system_status.latest_backup_name or 'Belum ada backup' }}">
+          {{ system_status.latest_backup_name or 'Belum ada file backup' }}
+        </p>
+        <p class="text-[11px] text-slate-500">{{ system_status.latest_backup_size or '-' }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Management Section -->
+  <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 transition-colors">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white">Manajemen Pengguna Sistem</h3>
+          <p class="text-xs text-slate-500">Tinjau pengguna yang menunggu persetujuan, aktif, atau diblokir.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Table (Desktop & Mobile Responsive) -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase tracking-wider text-[10px] border-y border-slate-200 dark:border-slate-800">
+          <tr>
+            <th class="py-2.5 px-3">Pengguna</th>
+            <th class="py-2.5 px-3">Telegram ID</th>
+            <th class="py-2.5 px-3">Peran</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Terdaftar</th>
+            <th class="py-2.5 px-3 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          {% for u in users %}
+          <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+            <!-- Nama & ID -->
+            <td class="py-3 px-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px] text-slate-700 dark:text-slate-200 flex-shrink-0">
+                  {{ u.name[:2].upper() }}
+                </div>
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-white">{{ u.name }}</p>
+                  <p class="text-[10px] text-slate-400 font-mono">ID: #{{ u.id }}</p>
+                </div>
+              </div>
+            </td>
+
+            <!-- Telegram ID -->
+            <td class="py-3 px-3 font-mono text-slate-700 dark:text-slate-300">
+              {{ u.telegram_id }}
+            </td>
+
+            <!-- Peran -->
+            <td class="py-3 px-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {% if u.role == 'admin' %}bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300{% endif %}">
+                {{ u.role.upper() }}
+              </span>
+            </td>
+
+            <!-- Status Badge -->
+            <td class="py-3 px-3">
+              {% if u.status == 'active' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Aktif
+              </span>
+              {% elif u.status == 'pending' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 animate-pulse">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Pending
+              </span>
+              {% elif u.status == 'blocked' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Diblokir
+              </span>
+              {% else %}
+              <span class="text-slate-400">{{ u.status }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Terdaftar -->
+            <td class="py-3 px-3 text-slate-500 text-[11px]">
+              {{ u.created_at_display }}
+            </td>
+
+            <!-- Action Buttons -->
+            <td class="py-3 px-3 text-right">
+              <div class="inline-flex items-center gap-1.5">
+                {% if u.status == 'pending' %}
+                <!-- Tombol Setujui -->
+                <button
+                  type="button"
+                  hx-post="/admin/users/{{ u.id }}/approve"
+                  hx-swap="none"
+                  class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-[11px] shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  <span>Setujui</span>
+                </button>
+                {% endif %}
+
+                {% if u.status != 'blocked' and u.id != user.id %}
+                <!-- Tombol Blokir -->
+                <button
+                  type="button"
+                  hx-post="/admin/users/{{ u.id }}/block"
+                  hx-confirm="Apakah Anda yakin ingin memblokir akses pengguna {{ u.name }}?"
+                  hx-swap="none"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/50 text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 rounded-lg font-semibold text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                  <span>Blokir</span>
+                </button>
+                {% elif u.status == 'blocked' and u.id != user.id %}
+                <!-- Tombol Aktifkan Kembali -->
+                <button
+                  type="button"
+                  hx-post="/admin/users/{{ u.id }}/approve"
+                  hx-swap="none"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-emerald-950/50 text-slate-600 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 rounded-lg font-semibold text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>Aktifkan</span>
+                </button>
+                {% elif u.id == user.id %}
+                <span class="text-[10px] text-slate-400 italic">Akun Anda</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Invite Codes Management Section -->
+  <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 transition-colors">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white">Manajemen Kode Undangan (Invites)</h3>
+          <p class="text-xs text-slate-500">Buat kode pendaftaran sekali pakai dengan masa kedaluwarsa opsional.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Tambah Kode Undangan -->
+    <form
+      hx-post="/admin/invites/create"
+      hx-swap="none"
+      class="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 mb-5 flex flex-col md:flex-row gap-3 items-end"
+    >
+      <div class="w-full md:w-1/2">
+        <label for="custom_code" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+          Kode Kustom (Opsional)
+        </label>
+        <input
+          type="text"
+          id="custom_code"
+          name="custom_code"
+          placeholder="Kosongkan untuk generate acak (cth: VIP-2026)"
+          class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <div class="w-full md:w-1/3">
+        <label for="expires_in_days" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+          Masa Berlaku
+        </label>
+        <select
+          id="expires_in_days"
+          name="expires_in_days"
+          class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+        >
+          <option value="">Selamanya (Tidak Kedaluwarsa)</option>
+          <option value="1">1 Hari</option>
+          <option value="3">3 Hari</option>
+          <option value="7" selected>7 Hari (Rekomendasi)</option>
+          <option value="30">30 Hari</option>
+        </select>
+      </div>
+
+      <div class="w-full md:w-auto">
+        <button
+          type="submit"
+          class="w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span>Buat Kode</span>
+        </button>
+      </div>
+    </form>
+
+    <!-- Invites Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase tracking-wider text-[10px] border-y border-slate-200 dark:border-slate-800">
+          <tr>
+            <th class="py-2.5 px-3">Kode Undangan</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Dibuat Pada</th>
+            <th class="py-2.5 px-3">Kedaluwarsa</th>
+            <th class="py-2.5 px-3">Digunakan</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          {% for inv in invites %}
+          <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+            <!-- Kode & Salin -->
+            <td class="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
+              <div class="flex items-center gap-2">
+                <span>{{ inv.code }}</span>
+                <button
+                  type="button"
+                  onclick="navigator.clipboard.writeText('{{ inv.code }}'); alert('Kode disalin: {{ inv.code }}')"
+                  title="Salin Kode"
+                  class="p-1 text-slate-400 hover:text-indigo-600 transition-colors rounded"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                </button>
+              </div>
+            </td>
+
+            <!-- Status Label -->
+            <td class="py-2.5 px-3">
+              {% if inv.status_label == 'Aktif' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                Aktif
+              </span>
+              {% elif inv.status_label == 'Terpakai' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                Terpakai
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
+                Kedaluwarsa
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Dibuat Pada -->
+            <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
+              {{ inv.created_at_display }}
+            </td>
+
+            <!-- Kedaluwarsa -->
+            <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
+              {{ inv.expires_at_display }}
+            </td>
+
+            <!-- Digunakan Oleh -->
+            <td class="py-2.5 px-3 text-slate-500 text-[11px]">
+              {% if inv.is_used %}
+                <span>User #{{ inv.used_by_id }} ({{ inv.used_at_display }})</span>
+              {% else %}
+                <span class="text-slate-400">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="py-6 text-center text-slate-400">
+              Belum ada kode undangan yang dibuat.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

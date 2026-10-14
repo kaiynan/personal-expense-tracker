@@ -38,6 +38,7 @@ from utils.errors import NotFoundError, ValidationError
 from utils.validators import (
     parse_date,
     validate_amount,
+    validate_balance,
     validate_category,
     validate_method,
     validate_note,
@@ -150,10 +151,13 @@ def list_transactions(
     keyword: str | None = None,
     include_deleted: bool = False,
     limit: int | None = None,
+    min_amount: object | None = None,
+    max_amount: object | None = None,
 ) -> list[Transaction]:
     """Daftar transaksi milik `user_id` (default hanya `active`), terbaru dulu.
 
     `start`/`end` menerima `date` atau teks DD-MM-YYYY (inklusif).
+    `min_amount`/`max_amount` memfilter nominal transaksi (inklusif).
     """
     if type_ is not None and type_ not in TRANSACTION_TYPES:
         raise ValidationError(f"Jenis transaksi tidak dikenal: {type_!r}.")
@@ -164,6 +168,15 @@ def list_transactions(
     if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0):
         raise ValidationError("Batas jumlah harus bilangan bulat positif.")
     keyword = keyword.strip() if keyword else None
+
+    min_val = None
+    if min_amount is not None:
+        min_val = validate_balance(min_amount, "Nominal minimum")
+    max_val = None
+    if max_amount is not None:
+        max_val = validate_balance(max_amount, "Nominal maksimum")
+    if min_val is not None and max_val is not None and min_val > max_val:
+        raise ValidationError("Nominal minimum tidak boleh lebih besar dari nominal maksimum.")
 
     return queries.list_transactions(
         session,
@@ -176,6 +189,8 @@ def list_transactions(
         keyword=keyword or None,
         include_deleted=include_deleted,
         limit=limit,
+        min_amount=min_val,
+        max_amount=max_val,
     )
 
 

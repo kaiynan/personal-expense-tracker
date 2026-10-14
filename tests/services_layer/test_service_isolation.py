@@ -53,13 +53,24 @@ from services.budgets import (
 )
 from services.categories import (
     add_category,
+    add_payment_method,
     archive_category,
+    archive_payment_method,
     get_category,
     list_categories,
+    list_payment_methods,
     rename_category,
+    rename_payment_method,
     unarchive_category,
+    unarchive_payment_method,
 )
-from services.dashboard import get_dashboard_summary, get_runway_metrics
+from services.dashboard import (
+    get_balance_trend_chart_data,
+    get_cash_flow_chart_data,
+    get_category_chart_data,
+    get_dashboard_summary,
+    get_runway_metrics,
+)
 from services.export import (
     export_csv,
     export_excel,
@@ -371,6 +382,39 @@ def test_categories_isolation(session, alice, bob):
     unarchived = unarchive_category(session, alice.id, a_cat.id)
     assert unarchived.is_archived is False
 
+    # --- payment_methods ---
+    alice_pms = list_payment_methods(session, alice.id)
+    bob_pms = list_payment_methods(session, bob.id)
+    assert alice_pms
+    assert bob_pms
+    assert {m.id for m in alice_pms}.isdisjoint({m.id for m in bob_pms})
+
+    # add_payment_method
+    a_pm = add_payment_method(session, alice.id, "Crypto Wallet")
+    assert a_pm.user_id == alice.id
+    b_pm = add_payment_method(session, bob.id, "Crypto Wallet")
+    assert b_pm.user_id == bob.id
+    assert a_pm.id != b_pm.id
+
+    # rename_payment_method
+    with pytest.raises(NotFoundError):
+        rename_payment_method(session, bob.id, a_pm.id, "Crypto Baru")
+    renamed_pm = rename_payment_method(session, alice.id, a_pm.id, "Crypto Baru")
+    assert renamed_pm.name == "Crypto Baru"
+    assert b_pm.name == "Crypto Wallet"
+
+    # archive_payment_method
+    with pytest.raises(NotFoundError):
+        archive_payment_method(session, bob.id, a_pm.id)
+    archived_pm = archive_payment_method(session, alice.id, a_pm.id)
+    assert archived_pm.is_archived is True
+
+    # unarchive_payment_method
+    with pytest.raises(NotFoundError):
+        unarchive_payment_method(session, bob.id, a_pm.id)
+    unarchived_pm = unarchive_payment_method(session, alice.id, a_pm.id)
+    assert unarchived_pm.is_archived is False
+
 
 # --- budgets ------------------------------------------------------------------
 def test_budgets_isolation(session, alice, bob):
@@ -433,6 +477,28 @@ def test_get_runway_metrics_isolation(session, alice, bob, setup):
     assert b_runway.total_balance == 450_000
     assert a_runway.daily_burn_rate == 100_000
     assert b_runway.daily_burn_rate == 50_000
+
+
+def test_chart_data_isolation(session, alice, bob, setup):
+    # 1. get_category_chart_data
+    a_exp_chart = get_category_chart_data(
+        session, alice.id, "expense", period="monthly", ref_date=D
+    )
+    b_exp_chart = get_category_chart_data(session, bob.id, "expense", period="monthly", ref_date=D)
+    assert a_exp_chart["total"] == 100_000
+    assert b_exp_chart["total"] == 50_000
+
+    # 2. get_cash_flow_chart_data
+    a_flow = get_cash_flow_chart_data(session, alice.id, period="monthly", ref_date=D)
+    b_flow = get_cash_flow_chart_data(session, bob.id, period="monthly", ref_date=D)
+    assert a_flow["total_expense"] == 100_000
+    assert b_flow["total_expense"] == 50_000
+
+    # 3. get_balance_trend_chart_data
+    a_trend = get_balance_trend_chart_data(session, alice.id, period="monthly", ref_date=D)
+    b_trend = get_balance_trend_chart_data(session, bob.id, period="monthly", ref_date=D)
+    assert a_trend["current_balance"] == 900_000
+    assert b_trend["current_balance"] == 450_000
 
 
 # --- recurring ----------------------------------------------------------------

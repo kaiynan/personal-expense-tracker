@@ -29,15 +29,13 @@ RUN mkdir -p /app/data /app/reports_output /app/backups /app/logs && \
 
 # Deklarasi pengguna non-root demi kepatuhan keamanan
 USER appuser
-# Eksekusi entrypoint sebagai root agar izin persistent volume cloud (Railway/Docker) dapat disesuaikan otomatis
-USER root
 
-# Healthcheck berkala untuk memastikan database dan sistem siap melayani
+# Healthcheck berkala untuk memastikan endpoint /health dan database siap melayani
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python scripts/healthcheck.py || exit 1
 
 # Entrypoint otomatis menjalankan backup pra-migrasi dan alembic upgrade head
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
-# Default command: jalankan Telegram Bot
+# Default command: jalankan Telegram Bot (atau Web Dashboard jika $PORT Railway disetel)
 CMD ["python", "main.py", "--bot"]

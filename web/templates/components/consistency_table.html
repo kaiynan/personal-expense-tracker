@@ -1,0 +1,43 @@
+<div id="consistency-results-container" class="mt-4 p-4 rounded-xl border {% if all_consistent %}bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800{% else %}bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800{% endif %}">
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-xs font-bold uppercase tracking-wider {% if all_consistent %}text-emerald-700 dark:text-emerald-400{% else %}text-amber-700 dark:text-amber-400{% endif %}">
+      Hasil Audit Konsistensi Saldo
+    </span>
+    <span class="text-[11px] font-medium {% if all_consistent %}text-emerald-600 dark:text-emerald-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">
+      {% if all_consistent %}✓ Semua metode 100% cocok{% else %}⚠️ Terdapat selisih saldo{% endif %}
+    </span>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs">
+      <thead>
+        <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+          <th class="py-2">Metode Pembayaran</th>
+          <th class="py-2 text-right">Saldo Agregat</th>
+          <th class="py-2 text-right">Saldo Mutasi Mentah</th>
+          <th class="py-2 text-right">Selisih</th>
+          <th class="py-2 text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+        {% for r in results %}
+        <tr>
+          <td class="py-2 font-medium text-slate-800 dark:text-slate-200">{{ r.name }}</td>
+          <td class="py-2 text-right font-mono text-slate-700 dark:text-slate-300">{{ format_rupiah(r.compute_balance) }}</td>
+          <td class="py-2 text-right font-mono text-slate-700 dark:text-slate-300">{{ format_rupiah(r.raw_balance) }}</td>
+          <td class="py-2 text-right font-mono {% if r.difference == 0 %}text-slate-400{% else %}text-rose-600 font-bold{% endif %}">
+            {{ format_rupiah(r.difference) }}
+          </td>
+          <td class="py-2 text-center">
+            {% if r.is_consistent %}
+            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Konsisten</span>
+            {% else %}
+            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">Mismatch</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

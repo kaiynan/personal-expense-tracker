@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime
 from typing import Any
@@ -74,14 +75,42 @@ def print_welcome(user_name: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Jalankan aplikasi. Mengembalikan kode keluar (0 = sukses)."""
     parser = argparse.ArgumentParser(description=config.APP_NAME)
-    parser.add_argument("--bot", action="store_true", help="Jalankan antarmuka Telegram Bot")
+    parser.add_argument("--bot", action="store_true", help="Jalankan antarmuka Telegram Bot saja")
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Jalankan Web Dashboard (+ Telegram Bot bersamaan dalam satu proses)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Port server web (default: $PORT atau 8000)",
+    )
+    parser.add_argument(
+        "--no-bot",
+        action="store_true",
+        help="Nonaktifkan polling bot di Web Dashboard (berguna jika bot sudah aktif di cloud)",
+    )
     args = parser.parse_args(argv)
+
+    if args.no_bot:
+        os.environ["ENABLE_BOT_POLLING"] = "false"
 
     setup_logging()
     try:
         config.ensure_directories()
         engine, user_id, user_name = init_database()
         try:
+            if args.web:
+                import uvicorn
+
+                port = args.port or int(os.environ.get("PORT", "8000"))
+                logger.info("Menjalankan %s Web Dashboard di port %s...", config.APP_NAME, port)
+                engine.dispose()
+                uvicorn.run("web.app:app", host="0.0.0.0", port=port, log_level="info")
+                return 0
+
             factory = create_session_factory(engine)
             if args.bot:
                 logger.info("Menjalankan %s Telegram Bot...", config.APP_NAME)
@@ -90,7 +119,8 @@ def main(argv: list[str] | None = None) -> int:
                 print_welcome(user_name)
                 run_cli(factory, user_id)
         finally:
-            engine.dispose()
+            if not args.web:
+                engine.dispose()
     except Exception:
         logger.exception("Gagal menjalankan aplikasi")
         return 1

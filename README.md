@@ -1,6 +1,6 @@
 # Personal Expense Tracker
 
-Aplikasi pengelolaan keuangan pribadi yang fleksibel, aman, dan mudah digunakan dengan dua antarmuka terintegrasi: **CLI interaktif (Terminal)** dan **Telegram Bot**, berbagi satu database **SQLite** terpusat.
+Aplikasi pengelolaan keuangan pribadi yang fleksibel, aman, dan mudah digunakan dengan tiga antarmuka terintegrasi: **Web Dashboard (Modern Fintech)**, **Telegram Bot**, dan **CLI interaktif (Terminal)**, berbagi satu database **SQLite** terpusat.
 
 Arsitektur aplikasi dirancang berlapis secara ketat (*Interface → Services → Database/Models*), tanpa SQL mentah di antarmuka, perhitungan saldo berbasis query agregat murni tanpa floating-point, dan seluruh alur telah diverifikasi dengan pengujian otomatis (*automated testing*).
 
@@ -22,25 +22,39 @@ Operasi tetap berhasil dieksekusi dan disimpan, namun pengguna mendapatkan pembe
 3. **Koreksi Saldo Baru**: Transaksi masa lampau diedit atau dihapus padahal terdapat transaksi koreksi saldo (*adjustment*) yang lebih baru pada metode pembayaran tersebut (mengingatkan bahwa koreksi tersebut mungkin perlu ditinjau ulang).
 
 ### 3. Integritas & Konsistensi Data
-- **Perintah Cek Konsistensi Saldo**: Membandingkan hasil formula agregat database (`compute_balance`) dengan perhitungan mutasi baris-demi-baris dari data mentah (*raw ledger*). Tersedia di CLI (menu 15) dan Bot Telegram (`/konsistensi` atau `/cek_saldo`).
+- **Perintah Cek Konsistensi Saldo**: Membandingkan hasil formula agregat database (`compute_balance`) dengan perhitungan mutasi baris-demi-baris dari data mentah (*raw ledger*). Tersedia di Web Dashboard, Bot Telegram (`/konsistensi`), dan CLI.
 - **Soft Delete & Restore**: Transaksi yang dihapus diberi tanda `deleted` sehingga riwayat tetap terlacak dan dapat dipulihkan (*restore*) kapan saja. Menghapus atau memulihkan transfer secara otomatis mengikutsertakan transaksi biaya adminnya.
 
 ### 4. Analisis & Laporan Keuangan
 - **Dashboard Interaktif**: Menampilkan saldo per metode pembayaran, saldo total, total pemasukan dan pengeluaran bulan berjalan, jumlah transaksi, serta progress penggunaan anggaran.
-- **Laporan Periode**: Laporan mingguan (Senin s.d. Minggu) dan bulanan berisi ringkasan pemasukan, pengeluaran, surplus/defisit, rincian pengeluaran per kategori, dan transaksi terbesar.
-- **Grafik Keuangan (Matplotlib PNG)**: Pembuatan 4 grafik beresolusi tinggi yang disimpan ke `reports_output/` dan dapat dikirim langsung oleh bot Telegram:
-  1. Pengeluaran per Kategori (*Pie/Donut/Bar Chart*)
-  2. Pemasukan per Kategori
-  3. Pemasukan vs Pengeluaran per Periode (*Bar Chart*)
-  4. Perkembangan Saldo Kumulatif (*Line Trend*)
+- **Laporan Periode**: Laporan harian, mingguan (Senin s.d. Minggu), bulanan, dan perbandingan periode berisi ringkasan pemasukan, pengeluaran, surplus/defisit, rincian per kategori, dan transaksi terbesar.
+- **Ekspor Multi-Format**: Unduh laporan dalam format **CSV**, **Excel (.xlsx)**, dan **PDF** lengkap dengan perlindungan formula injection untuk sel yang berawalan `=`, `+`, `-`, atau `@`.
+- **Grafik Keuangan**:
+  - **Web Dashboard**: 4 visualisasi interaktif via Chart.js (Donut Pengeluaran, Donut Pemasukan, Bar Arus Kas, Line Tren Saldo).
+  - **Telegram Bot**: 4 grafik beresolusi tinggi (Matplotlib PNG) dikirim langsung ke ruang chat.
 
-### 5. Manajemen Anggaran (Budgeting)
-- Mengatur batas anggaran bulanan secara global maupun per kategori pengeluaran.
-- Evaluasi otomatis dengan peringatan di dua ambang batas:
+### 5. Manajemen Anggaran (Budgeting) & Transaksi Rutin
+- Mengatur batas anggaran bulanan global maupun per kategori pengeluaran, anggaran mingguan, dan rollover sisa budget.
+- Evaluasi otomatis dengan indikator visual di dua ambang batas:
   - $\ge 80\%$ : Mendekati batas anggaran (*Warning*).
   - $\ge 100\%$ : Melebihi batas anggaran (*Danger*).
+- **Transaksi Rutin (Recurring)**: Penjadwalan pengeluaran dan pemasukan berulang (harian, mingguan, bulanan) dengan eksekusi otomatis.
 
-### 6. Antarmuka Telegram Bot (Async & Interactive)
+### 6. Antarmuka Web Dashboard (FastAPI, Tailwind CSS, HTMX, Chart.js)
+- **App Shell Fintech Modern**: Desain responsif (Desktop Sidebar, Mobile Bottom Bar), dukungan Light/Dark mode, dan sensor **Privacy Mode (👁️)** untuk menyembunyikan nominal saldo di tempat umum.
+- **Autentikasi OTP Telegram**: Pengguna login dengan memasukkan `telegram_id` dan memverifikasi kode OTP 6 digit yang dikirimkan secara privat oleh Telegram Bot (tanpa password, masa berlaku 5 menit, rate limit).
+- **Quick-Action Bar**: Input cepat transaksi di bagian atas dashboard (misal: `makan 15000 gopay`) dengan pratinjau konfirmasi HTMX instan.
+- **Modal Desktop & Drawer Bottom Sheet Mobile (`+`)**: Form pencatatan lengkap dengan tab Pengeluaran, Pemasukan, Transfer (dengan input biaya admin), dan Input Cepat.
+- **Live Rupiah Formatter**: Format angka otomatis saat mengetik (misal: `Rp15.000`) dengan batas aman hingga Rp10 miliar.
+- **Riwayat Transaksi Dinamis**: Filter jenis, kategori, metode, pencarian teks, rentang tanggal, pagination, serta aksi edit dan hapus tanpa reload halaman.
+- **Impor Mutasi CSV**: Wizard impor rekening dengan deteksi duplikat otomatis dan konfirmasi aturan kategori sebelum disimpan ke database.
+- **Panel Khusus Administrator (`/admin`)**:
+  - Dashboard status operasional sistem & diagnostik SQLite (path, ukuran, integritas, mode WAL, backup terbaru).
+  - Manajemen akun pengguna: persetujuan pendaftaran (*approve*) dan pemblokiran (*block*).
+  - Manajemen kode undangan (*invites*): pembuatan kode kustom/acak dan batas kedaluwarsa.
+  - Unduh cadangan sistem penuh (*full admin backup ZIP*).
+
+### 7. Antarmuka Telegram Bot (Async & Interactive)
 - Berbasis `python-telegram-bot` v22+ (asynchronous) dengan *Reply Keyboard* dan *Inline Keyboard*.
 - Alur percakapan langkah-demi-langkah (*ConversationHandler*) untuk menambah transaksi, transfer, dan anggaran.
 - Perintah Cepat (*Quick Commands*):
@@ -51,12 +65,14 @@ Operasi tetap berhasil dieksekusi dan disimpan, namun pengguna mendapatkan pembe
   - `/grafik` : Menghasilkan dan mengirim 4 grafik PNG ke chat.
   - `/budget` : Evaluasi dan monitoring status anggaran.
   - `/konsistensi` : Verifikasi konsistensi saldo agregat vs mutasi mentah.
+  - `/status` : Status operasional database & server (khusus admin).
   - `/batal` : Batalkan form input bertahap kapan saja.
-- Keamanan: Whitelist Telegram ID, token aman melalui `.env`, penanganan error global (*global error handler*) agar bot tidak crash diam-diam, dan tidak mencatat data sensitif pengguna ke log.
+- Keamanan: Whitelist Telegram ID, token aman melalui `.env`, penanganan error global (*global error handler*) agar bot tidak crash diam-diam, dan sanitasi log tanpa data finansial sensitif.
 
-### 7. File Logging
+### 8. File Logging & Penanganan Error
 - Logging otomatis ke konsol (`stderr`) dan file `logs/app.log`.
-- Format terstandarisasi dengan pembersihan data sensitif (tidak mencatat token bot, nomor token, nominal transaksi, maupun catatan pribadi ke log).
+- Format terstandarisasi dengan pembersihan data sensitif (tidak pernah mencatat token bot, kode OTP, nominal transaksi, maupun catatan pribadi ke log).
+- Global exception handler di FastAPI yang menyajikan halaman error ramah pengguna (403, 404, 500) dan toast HTMX tanpa mengekspos informasi internal sistem.
 
 ---
 
@@ -135,6 +151,9 @@ BUDGET_EXCEEDED_PERCENT=100
 
 # Level logging (INFO, DEBUG, WARNING, ERROR)
 LOG_LEVEL=INFO
+
+# Kunci rahasia signed session cookie Web Dashboard (wajib diisi acak di production)
+SECRET_KEY=ganti-dengan-kunci-rahasia-panjang-dan-acak-di-production
 ```
 
 > **Cara Mendapatkan Token Bot dan ID Telegram:**
@@ -147,7 +166,7 @@ LOG_LEVEL=INFO
 
 Skema database dikelola penuh oleh **Alembic**.
 
-Saat pertama kali `main.py` dijalankan, aplikasi otomatis menerapkan migrasi terbaru ke head dan mengisi data awal (*seed defaults*: akun default, metode Cash/Bank/E-Wallet, serta kategori default).
+Saat pertama kali aplikasi dijalankan, sistem otomatis menerapkan migrasi terbaru ke head dan mengisi data awal (*seed defaults*: akun default, metode Cash/Bank/E-Wallet, serta kategori default).
 
 Jika ingin menjalankan migrasi secara manual:
 ```bash
@@ -162,17 +181,24 @@ alembic check
 
 ## Cara Menjalankan Aplikasi
 
-Aplikasi memiliki dua mode yang dapat dijalankan:
+Aplikasi memiliki tiga mode pengoperasian yang dapat dipilih sesuai kebutuhan:
 
-### Mode 1: Antarmuka Terminal (CLI)
-Jalankan program utama secara interaktif:
+### Mode 1: Web Dashboard (+ Telegram Bot Bersamaan) — *Rekomendasi*
+Jalankan server web yang secara otomatis menyalakan **Web Dashboard** dan **Telegram Bot** (+ JobQueue) dalam satu proses event loop Python yang sama (`FastAPI lifespan`):
 ```bash
-python main.py
+python main.py --web
 ```
-Menu interaktif akan muncul dengan 15 pilihan menu lengkap mulai dari pencatatan transaksi, transfer, laporan, pembuatan 4 grafik, evaluasi budget, hingga cek konsistensi saldo.
+Atau menggunakan `uvicorn` langsung:
+```bash
+uvicorn web.app:app --host 0.0.0.0 --port 8000
+```
+Buka peramban (browser) di `http://localhost:8000`:
+1. Masukkan angka `telegram_id` Anda yang telah terdaftar/aktif.
+2. Bot Telegram akan mengirimkan kode OTP 6 digit.
+3. Masukkan kode OTP untuk masuk ke Dashboard Keuangan Anda!
 
-### Mode 2: Telegram Bot
-Jalankan bot Telegram dengan argumen `--bot`:
+### Mode 2: Telegram Bot Saja
+Jalankan hanya antarmuka bot Telegram dengan argumen `--bot`:
 ```bash
 python main.py --bot
 ```
@@ -181,6 +207,13 @@ Atau melalui modul bot langsung:
 python -m bot
 ```
 Buka bot di aplikasi Telegram Anda dan ketik `/start` untuk mulai mengelola keuangan.
+
+### Mode 3: Antarmuka Terminal (CLI)
+Jalankan program utama secara interaktif di terminal:
+```bash
+python main.py
+```
+Menu interaktif akan muncul dengan 15 pilihan menu lengkap mulai dari pencatatan transaksi, transfer, laporan, pembuatan grafik, evaluasi budget, hingga audit saldo.
 
 ---
 
@@ -252,39 +285,23 @@ Proyek ini siap produksi dengan [`Dockerfile`](Dockerfile) berbasis **Python 3.1
 - **Dependensi Terkunci**: Semua dependensi di [`requirements.txt`](requirements.txt) dipin versinya secara eksak (`==`) dan diaudit kerentanannya menggunakan `pip-audit`.
 
 ### 2. Langkah-Langkah Deploy
-1. **Siapkan Konfigurasi Lingkungan**:
-   ```bash
-   cp .env.example .env
-   # Edit token Telegram dan admin ID
-   nano .env
-   ```
-2. **Bangun Image dan Jalankan Layanan**:
-   ```bash
-   docker compose up -d --build
-   ```
-   *Catatan*: Script entrypoint (`docker-entrypoint.sh`) akan secara otomatis:
-   - Mencadangkan database SQLite yang ada (`scripts/backup_pre_migration.py`) sebelum migrasi.
-   - Menerapkan seluruh migrasi skema terbaru (`alembic upgrade head`).
-   - Menjalankan bot dengan auto-restart (`restart: unless-stopped`).
+### 3. Deployment Railway (Satu Container / Proses Tunggal)
 
-3. **Periksa Status dan Log Container**:
-   ```bash
-   # Cek status dan kesehatan container (HEALTHCHECK)
-   docker compose ps
+Aplikasi dirancang agar dapat di-deploy ke **Railway** dalam **satu container tunggal** yang menjalankan **Web Dashboard** dan **Telegram Bot** (+ JobQueue) secara berdampingan tanpa memerlukan dua container terpisah:
 
-   # Pantau log Telegram Bot
-   docker compose logs -f bot
-   ```
-
-4. **Menjalankan CLI Interaktif melalui Docker**:
-   ```bash
-   docker compose run --rm cli
-   ```
-
-5. **Menghentikan Layanan**:
-   ```bash
-   docker compose down
-   ```
+1. **Persistent Volume**:
+   - Hubungkan Railway Persistent Volume ke path `/app/data` agar database SQLite tetap persisten saat container me-restart atau me-redeploy.
+2. **Variabel Lingkungan di Railway Dashboard**:
+   - `TELEGRAM_BOT_TOKEN`: Token bot Anda dari @BotFather.
+   - `ALLOWED_TELEGRAM_IDS`: ID Telegram pengguna yang diizinkan (dipisahkan koma).
+   - `SECRET_KEY`: Kunci acak panjang untuk menandatangani cookie sesi web (misal hasil dari `openssl rand -hex 32`).
+   - `DB_PATH`: `/app/data/expense_tracker.db`
+   - `TZ`: `Asia/Jakarta`
+   - *Catatan*: Variabel `$PORT` disediakan otomatis oleh platform Railway. Server web akan mendeteksi dan mengikat ke port tersebut secara dinamis.
+3. **Mekanisme Startup Otomatis**:
+   - Saat container boot, `docker-entrypoint.sh` secara otomatis mengeksekusi backup pra-migrasi (`scripts/backup_pre_migration.py`) dan menerapkan migrasi skema database (`alembic upgrade head`).
+   - Perintah default container `python main.py --web` mengaktifkan `FastAPI lifespan`, yang menyalakan Telegram Bot dan Web Dashboard pada event loop Python yang sama.
+   - Pemeriksaan kesehatan (`HEALTHCHECK`) memantau kesiapan endpoint `/health` secara berkala.
 
 ---
 
@@ -316,13 +333,13 @@ Aplikasi memiliki strategi pencadangan berlapis untuk mencegah kehilangan data k
 
 ## Monitoring, Diagnostik, & Alerting Sistem
 
-- **Perintah `/status` Admin**:
-  Administrator dapat mengirim `/status` di Telegram untuk melihat:
+- **Perintah `/status` Bot & Panel Admin Web (`/admin`)**:
+  Administrator dapat memantau kesehatan operasional secara realtime:
   - Waktu server & zona waktu pengguna.
   - Ukuran file SQLite, mode jurnal (WAL), dan hasil `PRAGMA integrity_check`.
   - Jumlah total pengguna (aktif, pending, diblokir).
   - Jumlah transaksi keuangan dan cadangan yang tersedia.
-  - Jumlah job aktif di `JobQueue`.
+  - Unduh cadangan sistem penuh (*full admin backup ZIP*).
 - **Notifikasi Error Realtime**:
   Jika terjadi kesalahan tak terduga (*unhandled exception*) saat melayani pengguna:
   - Pengguna menerima pesan penanganan ramah.
@@ -343,14 +360,14 @@ Workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) berjalan pada se
 
 ### 2. Menjalankan Pengujian Lokal
 ```bash
-# Jalankan seluruh test suite
+# Jalankan seluruh test suite (950+ tests)
 pytest
 
 # Jalankan pengujian beban konkurensi SQLite secara spesifik
 pytest tests/test_concurrency_load.py -v
 
-# Jalankan pengujian operasional V3
-pytest tests/test_v3_operational.py -v
+# Jalankan pengujian web dashboard
+pytest tests/test_web_admin.py tests/test_web_w4.py -v
 
 # Lakukan audit keamanan paket lokal
 pip-audit -r requirements.txt
@@ -366,11 +383,11 @@ ruff format --check .
 
 ```
 personal_expense_tracker/
-├── main.py                   # Titik masuk utama aplikasi (CLI dan Bot launcher)
+├── main.py                   # Titik masuk utama aplikasi (CLI, Bot, dan Web launcher)
 ├── config.py                 # Konfigurasi terpusat & pembacaan environment
-├── Dockerfile                # Image container Python 3.12-slim, non-root user, HEALTHCHECK
+├── Dockerfile                # Image container Python 3.12-slim, non-root user, HEALTHCHECK /health
 ├── docker-compose.yml        # Orkestrasi layanan bot dan cli
-├── docker-entrypoint.sh      # Entrypoint: backup pra-migrasi, migrasi, dan startup
+├── docker-entrypoint.sh      # Entrypoint: backup pra-migrasi, migrasi, dan startup web/bot
 ├── .dockerignore             # Pengecualian rahasia (.env), git, dan volume data
 ├── pyproject.toml            # Metadata proyek & konfigurasi alat (Ruff, Pytest)
 ├── requirements.txt          # Daftar dependensi terkunci (pinned versions)
@@ -380,10 +397,15 @@ personal_expense_tracker/
 │   ├── dependabot.yml        # Konfigurasi Dependabot (pip, actions, docker)
 │   └── workflows/ci.yml      # CI workflow: ruff, pytest, alembic, pip-audit, docker build
 ├── scripts/
-│   ├── healthcheck.py        # Pemeriksaan kesehatan database container
+│   ├── healthcheck.py        # Pemeriksaan kesehatan endpoint /health & database SQLite
 │   ├── backup_pre_migration.py # Backup otomatis pra-migrasi dengan pemangkasan
 │   ├── backup_retention.py   # Backup berkala online dengan retensi 14 hari
 │   └── test_restore.py       # Skrip pengujian pemulihan cadangan terisolasi
+├── web/                      # Aplikasi FastAPI Web Dashboard (Fase W)
+│   ├── app.py                # App factory, lifespan Telegram Bot, session middleware, error handlers
+│   ├── deps.py               # Dependency injection (session factory, require_user, require_admin)
+│   ├── routes/               # Route handlers (auth, dashboard, charts, tx, budgets, admin, dll.)
+│   └── templates/            # Template Jinja2 (Tailwind CSS, HTMX, Chart.js via CDN)
 ├── alembic/                  # Skrip migrasi skema database
 ├── bot/                      # Modul Telegram Bot (async, handlers, keyboards, auth)
 ├── charts/                   # Pembuat grafik Matplotlib (Agg backend)
@@ -393,7 +415,7 @@ personal_expense_tracker/
 ├── reports/                  # Logika agregasi laporan mingguan & bulanan
 ├── services/                 # Lapisan logika bisnis sinkron (transaksi, transfer, saldo, budget, backup)
 ├── utils/                    # Validasi input, parsing tanggal, format Rupiah, rate limiter
-├── tests/                    # Test suite Pytest (800+ test case komprehensif)
+├── tests/                    # Test suite Pytest (950+ test case komprehensif)
 ├── data/                     # Lokasi file database SQLite (.db) [volume terisolasi]
 ├── backups/                  # Folder penyimpanan cadangan database (.db, .zip, .json)
 ├── logs/                     # File log aplikasi (app.log) [di-gitignore]

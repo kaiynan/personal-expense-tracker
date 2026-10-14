@@ -26,6 +26,7 @@ EXPECTED_TABLES = {
     "invites",
     "user_settings",
     "sent_notifications",
+    "web_login_otps",
 }
 
 
@@ -50,7 +51,7 @@ def test_upgrade_creates_all_tables(migrated_engine):
 
 def test_upgrade_records_version(migrated_engine):
     with migrated_engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0010"
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0011"
 
 
 def test_upgrade_is_repeatable(db_url):
@@ -147,7 +148,7 @@ def test_migration_0002_upgrade_downgrade(db_url):
     engine = create_db_engine(db_url)
     try:
         with engine.connect() as conn:
-            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0010"
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0011"
     finally:
         engine.dispose()
 
@@ -205,7 +206,7 @@ def test_migration_0003_upgrade_downgrade(db_url):
         insp = inspect(engine)
         assert "recurring" in set(insp.get_table_names())
         with engine.connect() as conn:
-            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0010"
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0011"
     finally:
         engine.dispose()
 
@@ -265,7 +266,7 @@ def test_migration_0004_upgrade_downgrade(db_url):
         insp = inspect(engine)
         assert "audit_log" in set(insp.get_table_names())
         with engine.connect() as conn:
-            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0010"
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0011"
     finally:
         engine.dispose()
 
@@ -871,6 +872,71 @@ def test_migration_0010_upgrade_downgrade(db_url):
                 )
     finally:
         engine.dispose()
+
+
+def test_migration_0011_upgrade_downgrade(db_url):
+    """Tes upgrade dan downgrade untuk revisi 0011 (tabel web_login_otps)."""
+    cfg = make_alembic_config(db_url)
+
+    # 1. Upgrade sampai 0010
+    command.upgrade(cfg, "0010")
+    engine = create_db_engine(db_url)
+    try:
+        insp = inspect(engine)
+        assert "web_login_otps" not in set(insp.get_table_names())
+    finally:
+        engine.dispose()
+
+    # 2. Upgrade ke 0011
+    command.upgrade(cfg, "0011")
+    engine = create_db_engine(db_url)
+    try:
+        insp = inspect(engine)
+        tables = set(insp.get_table_names())
+        assert "web_login_otps" in tables
+        cols = {c["name"] for c in insp.get_columns("web_login_otps")}
+        assert {"id", "user_id", "code_hash", "expires_at", "used_at", "created_at"} <= cols
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0011"
+    finally:
+        engine.dispose()
+
+    # 3. Downgrade kembali ke 0010
+    command.downgrade(cfg, "0010")
+    engine = create_db_engine(db_url)
+    try:
+        insp = inspect(engine)
+        assert "web_login_otps" not in set(insp.get_table_names())
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0010"
+    finally:
+        engine.dispose()
+
+
+def test_web_login_otps_check_constraints_in_migrated_database(migrated_engine):
+    with migrated_engine.connect() as conn:
+        conn.execute(
+            text("INSERT INTO users (id, name, created_at) VALUES (900, 'OtpUser', '2026-01-01')")
+        )
+        conn.commit()
+
+        # code_hash kosong ditolak
+        with pytest.raises(IntegrityError):
+            conn.execute(
+                text(
+                    "INSERT INTO web_login_otps (user_id, code_hash, expires_at, created_at) "
+                    "VALUES (900, '   ', '2026-01-01 00:05:00', '2026-01-01 00:00:00')"
+                )
+            )
+
+        # FK user_id tidak valid ditolak
+        with pytest.raises(IntegrityError):
+            conn.execute(
+                text(
+                    "INSERT INTO web_login_otps (user_id, code_hash, expires_at, created_at) "
+                    "VALUES (99999, 'validhash', '2026-01-01 00:05:00', '2026-01-01 00:00:00')"
+                )
+            )
 
 
 def test_downgrade_removes_tables(migrated_engine, db_url):

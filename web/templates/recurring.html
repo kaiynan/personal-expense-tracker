@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Transaksi Rutin - Personal Expense Tracker{% endblock %}
+{% block header_title %}Jadwal Transaksi Rutin{% endblock %}
+
+{% block content %}
+<div class="space-y-8" hx-trigger="recurringUpdated from:body" hx-get="/recurring" hx-select="#recurring-content" hx-target="#recurring-content" hx-swap="outerHTML">
+  <div id="recurring-content" class="space-y-8">
+    
+    <!-- Header -->
+    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <h2 class="text-xl font-bold text-slate-900 dark:text-white">Transaksi Rutin (Langganan & Tagihan)</h2>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        Atur otomatisasi pengeluaran dan pemasukan berulang seperti uang kos, paket internet, gaji, atau langganan streaming.
+      </p>
+    </div>
+
+    <!-- Form Tambah Transaksi Rutin Baru -->
+    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      <h3 class="font-bold text-base text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        <span>Jadwalkan Transaksi Rutin Baru</span>
+      </h3>
+
+      <form hx-post="/recurring/add" hx-target="#toast-container" hx-swap="beforeend" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- Nama Transaksi Rutin -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nama Jadwal</label>
+            <input
+              type="text"
+              name="name"
+              placeholder="misal: Uang Kos, Internet Wifi, Netflix"
+              required
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <!-- Jenis (Pengeluaran / Pemasukan) -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Jenis Transaksi</label>
+            <select
+              id="recurring-type"
+              name="type"
+              onchange="toggleRecurringCategories()"
+              required
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="expense" selected>Pengeluaran</option>
+              <option value="income">Pemasukan</option>
+            </select>
+          </div>
+
+          <!-- Nominal -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nominal (Rp)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+              <input
+                type="text"
+                name="amount"
+                placeholder="750.000"
+                required
+                oninput="formatRupiahLive(this)"
+                class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <!-- Kategori Dropdown -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Kategori</label>
+            <!-- Dropdown Pengeluaran -->
+            <select
+              id="recurring-expense-cats"
+              name="category_id"
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {% for c in expense_categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+
+            <!-- Dropdown Pemasukan (Hidden Default) -->
+            <select
+              id="recurring-income-cats"
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 hidden"
+              disabled
+            >
+              {% for c in income_categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Metode Pembayaran -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Metode Pembayaran</label>
+            <select
+              name="method_id"
+              required
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {% for m in methods %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Frekuensi -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Frekuensi Jadwal</label>
+            <select
+              id="recurring-freq"
+              name="frequency"
+              onchange="toggleDayOfMonth()"
+              required
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="monthly" selected>Bulanan</option>
+              <option value="weekly">Mingguan</option>
+              <option value="daily">Harian</option>
+              <option value="yearly">Tahunan</option>
+            </select>
+          </div>
+
+          <!-- Tanggal dalam Bulan (Hanya jika Bulanan) -->
+          <div id="day-of-month-container">
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Tanggal Tiap Bulan (1-31)</label>
+            <input
+              type="number"
+              id="day-of-month-input"
+              name="day_of_month"
+              min="1"
+              max="31"
+              value="1"
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <!-- Tanggal Mulai -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Mulai Berlaku</label>
+            <input
+              type="text"
+              name="start_date"
+              placeholder="DD-MM-YYYY"
+              value="{{ today_str }}"
+              required
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <!-- Tanggal Selesai (Opsional) -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Berakhir Pada (Opsional)</label>
+            <input
+              type="text"
+              name="end_date"
+              placeholder="DD-MM-YYYY"
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+
+        <!-- Keterangan Opsional & Tombol Submit -->
+        <div class="flex flex-col sm:flex-row gap-4 items-end pt-2">
+          <div class="flex-1 w-full">
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Catatan Tambahan (Opsional)</label>
+            <input
+              type="text"
+              name="note"
+              placeholder="misal: Jatuh tempo tgl 25"
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="w-full sm:w-auto px-6 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+          >
+            Simpan Jadwal Rutin
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Daftar Transaksi Rutin yang Tersedia -->
+    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-900 dark:text-white">Daftar Transaksi Rutin ({{ recurring_rules | length }})</h3>
+      </div>
+
+      {% if recurring_rules %}
+      <div class="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+        {% for r in recurring_rules %}
+        <div class="p-4 bg-white dark:bg-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+          
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 mt-0.5 {% if r.type == 'income' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300{% else %}bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300{% endif %}">
+              {% if r.type == 'income' %}
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              {% else %}
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+              {% endif %}
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-sm text-slate-900 dark:text-white">{{ r.name }}</span>
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full {% if r.type == 'income' %}bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400{% else %}bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400{% endif %}">
+                  {{ "Pemasukan" if r.type == 'income' else "Pengeluaran" }}
+                </span>
+                <span class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {{ r.frequency_label }}{% if r.day_of_month %} (Tgl {{ r.day_of_month }}){% endif %}
+                </span>
+                {% if not r.is_active %}
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500">Nonaktif</span>
+                {% endif %}
+              </div>
+
+              <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                <span>Kategori: <strong class="text-slate-700 dark:text-slate-300">{{ r.category_name }}</strong></span>
+                <span>•</span>
+                <span>Metode: <strong class="text-slate-700 dark:text-slate-300">{{ r.method_name }}</strong></span>
+                {% if r.next_due_display and r.is_active %}
+                <span>•</span>
+                <span>Jatuh Tempo: <strong class="text-indigo-600 dark:text-indigo-400">{{ r.next_due_display }}</strong></span>
+                {% endif %}
+              </div>
+
+              {% if r.note %}
+              <p class="text-[11px] text-slate-400 italic">{{ r.note }}</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Nominal & Actions -->
+          <div class="flex items-center justify-between md:justify-end gap-4 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
+            <div class="text-right">
+              <span class="text-xs text-slate-400">Nominal:</span>
+              <p class="font-bold text-base text-slate-900 dark:text-white">{{ r.amount_formatted }}</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <!-- Toggle Active Button -->
+              <form hx-post="/recurring/{{ r.id }}/toggle" hx-target="#toast-container" hx-swap="beforeend">
+                <button
+                  type="submit"
+                  title="{% if r.is_active %}Nonaktifkan Jadwal{% else %}Aktifkan Jadwal{% endif %}"
+                  class="px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors cursor-pointer {% if r.is_active %}bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800{% else %}bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800{% endif %}"
+                >
+                  {{ "Nonaktifkan" if r.is_active else "Aktifkan" }}
+                </button>
+              </form>
+
+              <!-- Delete Button -->
+              <form hx-post="/recurring/{{ r.id }}/delete" hx-target="#toast-container" hx-swap="beforeend" onsubmit="return confirm('Hapus jadwal rutin \'{{ r.name }}\'?')">
+                <button
+                  type="submit"
+                  title="Hapus Jadwal"
+                  class="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </form>
+            </div>
+
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+        <p class="text-sm text-slate-500 dark:text-slate-400">Belum ada transaksi rutin yang dijadwalkan.</p>
+      </div>
+      {% endif %}
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function toggleRecurringCategories() {
+    const type = document.getElementById('recurring-type').value;
+    const expSelect = document.getElementById('recurring-expense-cats');
+    const incSelect = document.getElementById('recurring-income-cats');
+
+    if (type === 'expense') {
+      expSelect.classList.remove('hidden');
+      expSelect.name = 'category_id';
+      expSelect.disabled = false;
+      incSelect.classList.add('hidden');
+      incSelect.name = '';
+      incSelect.disabled = true;
+    } else {
+      expSelect.classList.add('hidden');
+      expSelect.name = '';
+      expSelect.disabled = true;
+      incSelect.classList.remove('hidden');
+      incSelect.name = 'category_id';
+      incSelect.disabled = false;
+    }
+  }
+
+  function toggleDayOfMonth() {
+    const freq = document.getElementById('recurring-freq').value;
+    const container = document.getElementById('day-of-month-container');
+    const input = document.getElementById('day-of-month-input');
+
+    if (freq === 'monthly') {
+      container.classList.remove('hidden');
+      input.disabled = false;
+    } else {
+      container.classList.add('hidden');
+      input.disabled = true;
+    }
+  }
+</script>
+{% endblock %}

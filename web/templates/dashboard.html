@@ -1,0 +1,587 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Personal Expense Tracker{% endblock %}
+{% block header_title %}Ringkasan Keuangan{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- 1. Quick-Action Bar (Input Cepat di Paling Atas Dashboard) -->
+  {% include "components/quick_action.html" %}
+
+  <!-- 2. Sambutan & Status Pengguna -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-xl shadow-emerald-700/15">
+    <div>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur mb-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+        Sistem Terhubung (SQLite WAL)
+      </span>
+      <h2 class="text-2xl font-black tracking-tight">Halo, {{ user.name }}! 👋</h2>
+      <p class="text-sm text-emerald-100 mt-1">
+        Web Dashboard siap digunakan. Riwayat dan mutasi tersinkronisasi otomatis dengan bot Telegram.
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        onclick="openTransactionModal()"
+        class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-emerald-800 font-bold text-sm shadow-md hover:bg-emerald-50 active:scale-95 transition-all cursor-pointer"
+      >
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span>Catat Baru</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. Kartu Metrik Keuangan Utama (Dengan Dukungan Privacy Toggle data-balance) -->
+  {% include "components/summary_cards.html" %}
+
+  <!-- 4. Panel Analitik Cerdas & Runway (Fitur V4) -->
+  <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Analitik Cerdas & Runway (V4)</h3>
+          <p class="text-xs text-slate-400 dark:text-slate-500">Evaluasi laju pengeluaran dan proyeksi daya tahan saldo</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
+        Analisis Prediktif Aktif
+      </span>
+    </div>
+
+    <!-- 4 Metrik Runway / Burn Rate -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 1. Laju Pengeluaran Harian -->
+      <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Burn Rate Harian</span>
+        <div class="text-xl font-black text-slate-900 dark:text-white mt-1" data-balance>
+          {{ runway.daily_burn_rate_display|default("Rp 0") }} <span class="text-xs font-normal text-slate-400 dark:text-slate-500">/ hari</span>
+        </div>
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Rata-rata pengeluaran per hari berjalan</p>
+      </div>
+
+      <!-- 2. Proyeksi Akhir Bulan -->
+      <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Proyeksi Akhir Bulan</span>
+        <div class="text-xl font-black text-slate-900 dark:text-white mt-1" data-balance>
+          {{ runway.projected_monthly_spend_display|default("Rp 0") }}
+        </div>
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Estimasi total pengeluaran sampai tutup bulan</p>
+      </div>
+
+      <!-- 3. Perkiraan Saldo Habis (Runway) -->
+      <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Perkiraan Saldo Habis</span>
+        <div class="text-xl font-black {% if runway.is_balance_exhausted %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} mt-1">
+          {% if runway.balance_exhaustion_date_display %}
+            {{ runway.balance_exhaustion_date_display }}
+          {% else %}
+            Surplus Aman
+          {% endif %}
+        </div>
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+          {% if runway.balance_runway_days is not none %}
+            Daya tahan ~{{ runway.balance_runway_days }} hari ke depan
+          {% else %}
+            Arus kas surplus / saldo tidak berkurang
+          {% endif %}
+        </p>
+      </div>
+
+      <!-- 4. Batas Harian Disarankan -->
+      <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+        <span class="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">Batas Harian Disarankan</span>
+        <div class="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1" data-balance>
+          {% if runway.recommended_daily_limit_display %}
+            {{ runway.recommended_daily_limit_display }} <span class="text-xs font-normal text-slate-400 dark:text-slate-500">/ hari</span>
+          {% else %}
+            -
+          {% endif %}
+        </div>
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Batas aman agar budget/saldo bertahan</p>
+      </div>
+    </div>
+
+    <!-- Deteksi Pengeluaran Tidak Wajar (Anomali / Outlier) -->
+    <div class="pt-2">
+      {% if anomalies %}
+      <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 space-y-2">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span class="text-sm font-bold">Perhatian: Terdeteksi {{ anomalies|length }} Transaksi Tidak Wajar (Outlier)</span>
+        </div>
+        <div class="space-y-1.5 pl-7 text-xs">
+          {% for anom in anomalies %}
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/50 dark:border-amber-900/40">
+            <div class="flex items-center gap-2">
+              <span class="font-bold" data-balance>{{ anom.amount_display }}</span>
+              <span class="text-slate-600 dark:text-slate-400">({{ anom.category_name }})</span>
+              {% if anom.note %}
+              <span class="text-slate-500 italic truncate max-w-xs">- {{ anom.note }}</span>
+              {% endif %}
+            </div>
+            <div class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+              {{ anom.reason }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
+        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Pola pengeluaran normal. Tidak terdeteksi transaksi pengeluaran anomali / lonjakan ekstrem bulan ini.</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 5. 4 Grafik Interaktif Chart.js -->
+  <div class="space-y-4">
+    <!-- Header Bagian Grafik & Pemilih Periode -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Visualisasi Keuangan</h3>
+        <p class="text-xs text-slate-400 dark:text-slate-500">Eksplorasi interaktif pemasukan, pengeluaran, dan arus kas</p>
+      </div>
+
+      <!-- Pemilih Periode: Mingguan / Bulanan -->
+      <div class="inline-flex items-center p-1 bg-slate-200/70 dark:bg-slate-800 rounded-2xl text-xs font-semibold">
+        <button
+          type="button"
+          id="btn-period-monthly"
+          onclick="switchChartPeriod('monthly')"
+          class="px-3.5 py-1.5 rounded-xl transition-all bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold cursor-pointer"
+        >
+          Bulanan
+        </button>
+        <button
+          type="button"
+          id="btn-period-weekly"
+          onclick="switchChartPeriod('weekly')"
+          class="px-3.5 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium cursor-pointer"
+        >
+          Mingguan (Sen–Min)
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid 4 Chart Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Chart 1: Pengeluaran per Kategori (Doughnut) -->
+      <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Pengeluaran per Kategori</h4>
+            <span id="label-period-exp" class="text-[11px] text-slate-400 dark:text-slate-500">Memuat periode...</span>
+          </div>
+          <span class="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/80 px-2.5 py-1 rounded-xl" id="total-exp-display" data-balance>
+            Rp 0
+          </span>
+        </div>
+        <div class="relative flex-1 flex items-center justify-center min-h-[260px] max-h-[300px]">
+          <canvas id="chart-expenses-category"></canvas>
+          <div id="empty-exp-msg" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 italic">
+            Tidak ada pengeluaran pada periode ini
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 2: Pemasukan per Kategori (Doughnut) -->
+      <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Pemasukan per Kategori</h4>
+            <span id="label-period-inc" class="text-[11px] text-slate-400 dark:text-slate-500">Memuat periode...</span>
+          </div>
+          <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-1 rounded-xl" id="total-inc-display" data-balance>
+            Rp 0
+          </span>
+        </div>
+        <div class="relative flex-1 flex items-center justify-center min-h-[260px] max-h-[300px]">
+          <canvas id="chart-income-category"></canvas>
+          <div id="empty-inc-msg" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 italic">
+            Tidak ada pemasukan pada periode ini
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 3: Pemasukan vs Pengeluaran (Bar Chart) -->
+      <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Arus Kas: Pemasukan vs Pengeluaran</h4>
+            <span id="label-period-cashflow" class="text-[11px] text-slate-400 dark:text-slate-500">Pergerakan harian</span>
+          </div>
+        </div>
+        <div class="relative flex-1 min-h-[260px] max-h-[300px]">
+          <canvas id="chart-cashflow"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 4: Perkembangan Saldo Kumulatif (Line Chart) -->
+      <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Perkembangan Saldo Total</h4>
+            <span id="label-period-trend" class="text-[11px] text-slate-400 dark:text-slate-500">Tren kumulatif</span>
+          </div>
+          <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2.5 py-1 rounded-xl" id="trend-last-balance" data-balance>
+            {{ total_balance_display }}
+          </span>
+        </div>
+        <div class="relative flex-1 min-h-[260px] max-h-[300px]">
+          <canvas id="chart-trend"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Inisialisasi dan Penanganan Chart.js (Adaptif Light/Dark Mode + Dynamic Period + Auto Refresh) -->
+<script>
+  let currentPeriod = 'monthly';
+  let chartExpInstance = null;
+  let chartIncInstance = null;
+  let chartFlowInstance = null;
+  let chartTrendInstance = null;
+
+  function isDarkTheme() {
+    return document.documentElement.classList.contains('dark');
+  }
+
+  function getThemeColors() {
+    const dark = isDarkTheme();
+    return {
+      textColor: dark ? '#cbd5e1' : '#475569',
+      gridColor: dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      tooltipBg: dark ? '#0f172a' : '#ffffff',
+      tooltipTitle: dark ? '#f8fafc' : '#0f172a',
+      tooltipBody: dark ? '#cbd5e1' : '#334155',
+      tooltipBorder: dark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+    };
+  }
+
+  const idrFormatter = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  });
+
+  // 1. Chart Pengeluaran Kategori
+  async function loadExpensesCategoryChart() {
+    const res = await fetch(`/api/charts/expenses-by-category?period=${currentPeriod}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const ctx = document.getElementById('chart-expenses-category').getContext('2d');
+    const emptyMsg = document.getElementById('empty-exp-msg');
+    const totalDisplay = document.getElementById('total-exp-display');
+    const periodLabel = document.getElementById('label-period-exp');
+
+    if (periodLabel) periodLabel.textContent = data.period_label || '';
+    if (totalDisplay) totalDisplay.textContent = idrFormatter.format(data.total || 0);
+
+    const hasData = data.values && data.values.length > 0 && data.total > 0;
+    if (!hasData) {
+      if (emptyMsg) emptyMsg.classList.remove('hidden');
+    } else {
+      if (emptyMsg) emptyMsg.classList.add('hidden');
+    }
+
+    const theme = getThemeColors();
+    if (chartExpInstance) chartExpInstance.destroy();
+
+    chartExpInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: hasData ? data.labels : ['Tidak Ada Data'],
+        datasets: [{
+          data: hasData ? data.values : [1],
+          backgroundColor: hasData ? data.colors : [isDarkTheme() ? '#334155' : '#e2e8f0'],
+          borderWidth: 2,
+          borderColor: isDarkTheme() ? '#0f172a' : '#ffffff',
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: theme.textColor,
+              font: { size: 11, family: 'sans-serif' },
+              padding: 12,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            enabled: hasData,
+            backgroundColor: theme.tooltipBg,
+            titleColor: theme.tooltipTitle,
+            bodyColor: theme.tooltipBody,
+            borderColor: theme.tooltipBorder,
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: (item) => ` ${item.label}: ${idrFormatter.format(item.raw)}`
+            }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // 2. Chart Pemasukan Kategori
+  async function loadIncomeCategoryChart() {
+    const res = await fetch(`/api/charts/income-by-category?period=${currentPeriod}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const ctx = document.getElementById('chart-income-category').getContext('2d');
+    const emptyMsg = document.getElementById('empty-inc-msg');
+    const totalDisplay = document.getElementById('total-inc-display');
+    const periodLabel = document.getElementById('label-period-inc');
+
+    if (periodLabel) periodLabel.textContent = data.period_label || '';
+    if (totalDisplay) totalDisplay.textContent = idrFormatter.format(data.total || 0);
+
+    const hasData = data.values && data.values.length > 0 && data.total > 0;
+    if (!hasData) {
+      if (emptyMsg) emptyMsg.classList.remove('hidden');
+    } else {
+      if (emptyMsg) emptyMsg.classList.add('hidden');
+    }
+
+    const theme = getThemeColors();
+    if (chartIncInstance) chartIncInstance.destroy();
+
+    chartIncInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: hasData ? data.labels : ['Tidak Ada Data'],
+        datasets: [{
+          data: hasData ? data.values : [1],
+          backgroundColor: hasData ? data.colors : [isDarkTheme() ? '#334155' : '#e2e8f0'],
+          borderWidth: 2,
+          borderColor: isDarkTheme() ? '#0f172a' : '#ffffff',
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: theme.textColor,
+              font: { size: 11, family: 'sans-serif' },
+              padding: 12,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            enabled: hasData,
+            backgroundColor: theme.tooltipBg,
+            titleColor: theme.tooltipTitle,
+            bodyColor: theme.tooltipBody,
+            borderColor: theme.tooltipBorder,
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: (item) => ` ${item.label}: ${idrFormatter.format(item.raw)}`
+            }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // 3. Chart Arus Kas: Pemasukan vs Pengeluaran
+  async function loadCashFlowChart() {
+    const res = await fetch(`/api/charts/income-vs-expense?period=${currentPeriod}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const ctx = document.getElementById('chart-cashflow').getContext('2d');
+    const periodLabel = document.getElementById('label-period-cashflow');
+    if (periodLabel) periodLabel.textContent = data.period_label || '';
+
+    const theme = getThemeColors();
+    if (chartFlowInstance) chartFlowInstance.destroy();
+
+    chartFlowInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [
+          {
+            label: 'Pemasukan',
+            data: data.incomes,
+            backgroundColor: '#10b981',
+            borderRadius: 6,
+          },
+          {
+            label: 'Pengeluaran',
+            data: data.expenses,
+            backgroundColor: '#f43f5e',
+            borderRadius: 6,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: theme.textColor, usePointStyle: true, pointStyle: 'circle' }
+          },
+          tooltip: {
+            backgroundColor: theme.tooltipBg,
+            titleColor: theme.tooltipTitle,
+            bodyColor: theme.tooltipBody,
+            borderColor: theme.tooltipBorder,
+            borderWidth: 1,
+            callbacks: {
+              label: (item) => ` ${item.dataset.label}: ${idrFormatter.format(item.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: theme.textColor, font: { size: 10 } }
+          },
+          y: {
+            grid: { color: theme.gridColor },
+            ticks: {
+              color: theme.textColor,
+              font: { size: 10 },
+              callback: (val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}jt` : (val >= 1000 ? `${val / 1000}rb` : val)
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 4. Chart Perkembangan Saldo Kumulatif
+  async function loadTrendChart() {
+    const res = await fetch(`/api/charts/balance-trend?period=${currentPeriod}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const ctx = document.getElementById('chart-trend').getContext('2d');
+    const periodLabel = document.getElementById('label-period-trend');
+    const lastBalDisplay = document.getElementById('trend-last-balance');
+
+    if (periodLabel) periodLabel.textContent = data.period_label || '';
+    if (lastBalDisplay && data.current_balance !== undefined) {
+      lastBalDisplay.textContent = idrFormatter.format(data.current_balance);
+    }
+
+    const theme = getThemeColors();
+    if (chartTrendInstance) chartTrendInstance.destroy();
+
+    chartTrendInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Saldo Kumulatif',
+          data: data.values,
+          borderColor: '#6366f1',
+          backgroundColor: isDarkTheme() ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.08)',
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: true,
+          pointRadius: data.labels.length > 15 ? 2 : 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#6366f1',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: theme.tooltipBg,
+            titleColor: theme.tooltipTitle,
+            bodyColor: theme.tooltipBody,
+            borderColor: theme.tooltipBorder,
+            borderWidth: 1,
+            callbacks: {
+              label: (item) => ` Saldo: ${idrFormatter.format(item.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: theme.textColor, font: { size: 10 } }
+          },
+          y: {
+            grid: { color: theme.gridColor },
+            ticks: {
+              color: theme.textColor,
+              font: { size: 10 },
+              callback: (val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}jt` : (val >= 1000 ? `${val / 1000}rb` : val)
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function reloadAllCharts() {
+    loadExpensesCategoryChart();
+    loadIncomeCategoryChart();
+    loadCashFlowChart();
+    loadTrendChart();
+  }
+
+  function switchChartPeriod(period) {
+    currentPeriod = period;
+    const btnMonthly = document.getElementById('btn-period-monthly');
+    const btnWeekly = document.getElementById('btn-period-weekly');
+
+    if (period === 'monthly') {
+      btnMonthly.className = 'px-3.5 py-1.5 rounded-xl transition-all bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold cursor-pointer';
+      btnWeekly.className = 'px-3.5 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium cursor-pointer';
+    } else {
+      btnWeekly.className = 'px-3.5 py-1.5 rounded-xl transition-all bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold cursor-pointer';
+      btnMonthly.className = 'px-3.5 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium cursor-pointer';
+    }
+
+    reloadAllCharts();
+  }
+
+  // Muat chart setelah DOM selesai
+  document.addEventListener('DOMContentLoaded', () => {
+    reloadAllCharts();
+  });
+
+  // Re-render chart saat tema berubah
+  const originalToggleTheme = window.toggleThemeMode;
+  window.toggleThemeMode = function () {
+    if (typeof originalToggleTheme === 'function') originalToggleTheme();
+    setTimeout(reloadAllCharts, 50);
+  };
+
+  // Dengarkan sinyal refresh dari HTMX (mis. setelah input cepat sukses)
+  document.body.addEventListener('refreshDashboard', () => {
+    reloadAllCharts();
+  });
+</script>
+{% endblock %}

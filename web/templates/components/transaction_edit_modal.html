@@ -1,0 +1,101 @@
+<!-- Modal Edit Transaksi (Fase W3) -->
+<div id="transaction-edit-modal" class="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+  <div class="fixed inset-0 -z-10" onclick="closeEditModal()"></div>
+
+  <div class="bg-white dark:bg-slate-900 rounded-t-3xl md:rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg text-slate-900 dark:text-white">Edit Transaksi #{{ tx.id }}</h3>
+      </div>
+      <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Form Edit -->
+    <form hx-post="/transactions/{{ tx.id }}/edit" hx-target="#toast-container" hx-swap="beforeend" class="p-6 overflow-y-auto space-y-4">
+      <!-- Jenis Transaksi Info (Read-Only) -->
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Jenis Transaksi:</div>
+        <div class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md
+          {% if tx.type == 'income' %}bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300
+          {% elif tx.type == 'expense' %}bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300
+          {% else %}bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300{% endif %}">
+          {{ tx.type }}
+        </div>
+      </div>
+
+      <!-- Nominal -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Nominal (Rp)</label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center font-bold text-slate-400">Rp</span>
+          <input type="text" name="amount" value="{{ amount_val }}" required class="rupiah-input w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+      </div>
+
+      <!-- Tanggal -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Tanggal (DD-MM-YYYY)</label>
+        <input type="text" name="date" value="{{ date_display }}" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="DD-MM-YYYY">
+      </div>
+
+      {% if tx.type != 'transfer' %}
+      <!-- Kategori (untuk Pemasukan / Pengeluaran) -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Kategori</label>
+        <select name="category_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+          {% for c in categories %}
+          <option value="{{ c.id }}" {% if c.id == tx.category_id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="grid grid-cols-1 {% if tx.type == 'transfer' %}md:grid-cols-2{% endif %} gap-4">
+        <!-- Metode Pembayaran -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+            {% if tx.type == 'transfer' %}Dari Metode{% else %}Metode Pembayaran{% endif %}
+          </label>
+          <select name="method_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+            {% for m in methods %}
+            <option value="{{ m.method_id }}" {% if m.method_id == tx.method_id %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if tx.type == 'transfer' %}
+        <!-- Ke Metode Pembayaran (Transfer) -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Ke Metode</label>
+          <select name="to_method_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+            {% for m in methods %}
+            <option value="{{ m.method_id }}" {% if m.method_id == tx.to_method_id %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Keterangan -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Keterangan (Opsional)</label>
+        <input type="text" name="note" value="{{ tx.note or '' }}" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Keterangan transaksi">
+      </div>
+
+      <div class="pt-3 flex gap-3">
+        <button type="button" onclick="closeEditModal()" class="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 font-semibold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+          Batal
+        </button>
+        <button type="submit" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 shadow-md shadow-emerald-600/30 transition-all cursor-pointer">
+          Simpan Perubahan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

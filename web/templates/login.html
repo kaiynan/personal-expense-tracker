@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Web Dashboard — Personal Expense Tracker</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Inisialisasi Tema Gelap/Terang (Light/Dark Mode) -->
+  <script>
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+
+  <!-- HTMX CDN -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="h-full bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 flex flex-col justify-center items-center p-4 transition-colors">
+
+  <!-- Floating Toast Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 md:px-0"></div>
+
+  <!-- Header Atas (Theme Toggle) -->
+  <div class="fixed top-4 right-4">
+    <button
+      type="button"
+      onclick="toggleThemeMode()"
+      title="Ganti Mode Terang / Gelap"
+      class="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 shadow-sm transition-colors cursor-pointer"
+    >
+      <svg id="theme-icon-sun" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      <svg id="theme-icon-moon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+    </button>
+  </div>
+
+  <!-- Main Auth Card -->
+  <div class="w-full max-w-md">
+    <!-- Brand Title -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h1 class="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Expense Tracker</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Web Dashboard Keuangan Pribadi</p>
+    </div>
+
+    <!-- Container Card (HTMX Target) -->
+    <div id="auth-card" class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 transition-all">
+      <!-- Langkah 1: Input Telegram ID -->
+      <div class="space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-white">Masuk dengan Telegram</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Gunakan ID akun Telegram Anda yang terdaftar pada bot untuk verifikasi OTP aman.
+          </p>
+        </div>
+
+        {% if error %}
+        <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm flex items-center gap-2">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form hx-post="/auth/request-otp" hx-target="#auth-card" hx-swap="innerHTML" class="space-y-4">
+          <div>
+            <label for="telegram-id" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              ID Telegram Anda
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
+              </div>
+              <input
+                type="text"
+                id="telegram-id"
+                name="telegram_id"
+                inputmode="numeric"
+                pattern="[0-9]+"
+                placeholder="Contoh: 123456789"
+                required
+                autofocus
+                class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm transition-all"
+              />
+            </div>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+              Tips: Cek ID Anda di Telegram lewat bot <span class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">@userinfobot</span>.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+          >
+            <span>Kirim Kode OTP</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </form>
+
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800/80 text-center">
+          <p class="text-xs text-slate-400 dark:text-slate-500">
+            🔒 Autentikasi terlindungi kata sandi satu kali (OTP) yang dikirim langsung ke obrolan Telegram resmi bot.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleThemeMode() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    function setupToasts(container) {
+      if (!container) return;
+      container.querySelectorAll('[data-auto-dismiss]').forEach(toast => {
+        if (toast.dataset.dismissScheduled) return;
+        toast.dataset.dismissScheduled = 'true';
+        const delay = parseInt(toast.getAttribute('data-auto-dismiss'), 10) || 3000;
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-10px)';
+          setTimeout(() => toast.remove(), 300);
+        }, delay);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupToasts(document.getElementById('toast-container'));
+    });
+
+    document.addEventListener('htmx:afterSwap', () => {
+      setupToasts(document.getElementById('toast-container'));
+    });
+  </script>
+</body>
+</html>

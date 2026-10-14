@@ -59,6 +59,7 @@ from models.entities import (
     Transaction,
     User,
     UserSetting,
+    WebLoginOtp,
     WeeklyBudget,
 )
 
@@ -121,5 +122,6 @@ __all__ = [
     "Transaction",
     "User",
     "UserSetting",
+    "WebLoginOtp",
     "WeeklyBudget",
 ]

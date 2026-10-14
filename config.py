@@ -101,6 +101,13 @@ LOG_FILE: Path = LOGS_DIR / "app.log"
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 LOG_FORMAT: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
+# --- Keamanan & Web Dashboard (Fase W) ---------------------------------------
+SECRET_KEY: str = os.getenv(
+    "SECRET_KEY", "personal-expense-tracker-secret-key-change-in-production"
+)
+WEB_OTP_EXPIRY_MINUTES: int = int(os.getenv("WEB_OTP_EXPIRY_MINUTES", "5"))
+WEB_OTP_RATE_LIMIT_PER_MINUTE: int = int(os.getenv("WEB_OTP_RATE_LIMIT_PER_MINUTE", "3"))
+
 
 def ensure_directories() -> None:
     """Buat folder data, logs, output laporan, dan backups jika belum ada."""

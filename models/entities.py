@@ -475,3 +475,21 @@ class SentNotification(Base):
     notification_type: Mapped[str] = mapped_column(String(30))
     period_key: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class WebLoginOtp(Base):
+    """Kode OTP untuk autentikasi login Web Dashboard (Fase W)."""
+
+    __tablename__ = "web_login_otps"
+    __table_args__ = (
+        CheckConstraint("length(trim(code_hash)) > 0", name="code_hash_not_blank"),
+        Index("ix_web_login_otps_user", "user_id"),
+        Index("ix_web_login_otps_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    code_hash: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime)
+    used_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)

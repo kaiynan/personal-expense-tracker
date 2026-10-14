@@ -7,8 +7,8 @@ Kamu adalah senior Python developer yang membantu saya membangun **Personal Expe
 - Docker + docker-compose dan GitHub Actions (lint, pytest, build image) sebagai fase tersendiri
 - `python-telegram-bot` v20+ (async)
 - `matplotlib` dengan backend `Agg` (tetap dipakai untuk pengiriman foto chart di Telegram Bot)
-- **Backend Web (Fase W):** `fastapi`, `uvicorn[standard]`, `jinja2`, `python-multipart`, `itsdangerous`
-- **Frontend Web (via CDN, tanpa Node.js/npm):** **Tailwind CSS**, **HTMX**, dan **Chart.js** (untuk grafik interaktif di web)
+- **Backend Web:** `fastapi`, `uvicorn[standard]`, `jinja2`, `python-multipart`, `itsdangerous`
+- **Frontend Web (via CDN, tanpa Node.js/npm):** **Tailwind CSS**, **HTMX**, dan **Chart.js** (untuk grafik interaktif di web, sedangkan `matplotlib` tetap dipakai untuk pengiriman foto chart di Telegram Bot)
 - `openpyxl` (export Excel), `fpdf2` (export PDF), `python-dotenv`
 - `pytest` untuk pengujian
 - **Jangan** memakai pandas (hemat RAM; target deploy server kecil/VPS dan kemungkinan dipakai publik)
