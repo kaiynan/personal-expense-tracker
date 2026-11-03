@@ -5,7 +5,7 @@ matplotlib==3.11.2
 openpyxl==3.1.5
 fpdf2==2.8.9
 python-dotenv==1.2.4
-tzdata==2026.5
+tzdata==2026.6
 pytest==9.1.1
 ruff==0.17.0
 fastapi==0.143.1
